@@ -1,0 +1,5 @@
+azure-functions
+azure-storage-blob>=12.19.0
+requests>=2.32.0
+tenacity>=8.2.3
+python-dateutil>=2.9.0
