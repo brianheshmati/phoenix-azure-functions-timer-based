@@ -35,7 +35,7 @@ DEST_SHEET_ID   = 4814574961250180  # hardcoded
 SRC_TANK_COL        = 3633417232797572
 SRC_ROW_COL         = 537192488980356
 SRC_ORDER_COL       = 8699966813589380 # columnId for "Order" here
-SRC_FRONTEND_COL = 6685380870623108
+SRC_FRONTEND_COL = 5744479558127492
 
 # Destination column IDs
 DEST_TANK_COL = 492931382988676
@@ -198,7 +198,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
     page = 1
     page_size = 500
 
-    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT} and Front-End - Site Work='Phoenix' or 'Subcontractor'")
+    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}' and Front-End - Site Work='Phoenix' or 'Subcontractor'")
 
     #while True:
     url = f"{SS_API_BASE}/sheets/{SOURCE_SHEET_ID}"
