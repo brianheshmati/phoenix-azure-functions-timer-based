@@ -63,13 +63,9 @@ IDENTITY_FOUNDATION_COLUMN_MAP : Dict[int, int] = {
     4407473418751876: 6790933986889604,  # Engineering firm
     8911073046122372: 1161434452676484,  # Owner
     1381617419112324: 7916833893732228,  # Bid #
-    #2366779837599620: 4346373213998980,  # Engineering
-    #7785173139279748: 1813098423603076,  # Primary column
-    #537192488980356:  5357923911552900,  # Row
+    5744479558127492: 6685380870623108,  # Front-End - Site Work
 }
-# logging.info(f"Using column map: {IDENTITY_ENGINEERING_COLUMN_MAP}")
 
-# IDENTITY_ENGINEERING_COLUMN_MAP = os.environ.get("IDENTITY_ENGINEERING_COLUMN_MAP", '{"123":"456"}')
 COLUMN_MAP: Dict[int, int] = {int(k): int(v) for k, v in IDENTITY_FOUNDATION_COLUMN_MAP.items()}
 
 STATE_CONTAINER = os.environ.get("STATE_CONTAINER")
@@ -136,13 +132,13 @@ def ss_get(url: str, params: Dict[str, Any] = None) -> requests.Response:
 
 def ss_post(url: str, body: Any) -> requests.Response:
     resp = requests.post(url, headers=HEADERS, data=json.dumps(body), timeout=60)
-    logging.info(f"Smartsheet POST {url}, headers {HEADERS}, body={body} response: {resp.json()}")
+    logging.info(f"Smartsheet POST {url}, response: {resp.json()}")
     resp.raise_for_status()
     return resp
 
 def ss_put(url: str, body: Any) -> requests.Response:
     resp = requests.put(url, headers=HEADERS, data=json.dumps(body), timeout=60)
-    logging.info(f"Smartsheet PUT {url} body={body} response: {resp.json()}")   
+    logging.info(f"Smartsheet PUT {url}, response: {resp.json()}")   
     resp.raise_for_status()
     return resp
 
@@ -226,7 +222,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
 
 def index_dest_by_tank_and_frontend() -> Dict[str, Dict[str, Any]]:
     """
-    Index destination (Engineering) rows by Tank# where Row == 'Engineering'.
+    Index destination (Foundation) rows by Tank#'.
     Uses the correct list endpoint: GET /sheets/{sheetId} with paging.
     """
     idx: Dict[str, Dict[str, Any]] = {}
@@ -303,8 +299,8 @@ def build_operations(
             # INSERT only if source "Front-End - Site Work" = "Phoenix" or "Subcontractor"
             if src_frontend_val == "Subcontractor" or src_frontend_val == "Phoenix":
                 mapped_cells.append({"columnId": 1618831289831300, "value": "Front-End - Site Work"})        # Primary column
-                mapped_cells.append({"columnId": 598484499255172, "value": "00002 - Front-End - Site Work"}) # Order
-                mapped_cells.append({"columnId": 5102084126625668, "value": "Front-End - Site Work"})        # Row
+                mapped_cells.append({"columnId": 598484499255172, "value": "0002 - Front-End - Site Work"}) # Order
+                #mapped_cells.append({"columnId": 5102084126625668, "value": "Front-End - Site Work"})        # Row
                 inserts.append({"toBottom": True, "cells": mapped_cells})
                 logging.info(f"[Plan] INSERT tank={tank_key} (Front-End - Site Work=Phoenix or Subcontractor)")
             else:
@@ -358,7 +354,7 @@ def main(mytimer: func.TimerRequest) -> None:
             return
 
         dest_index = index_dest_by_tank_and_frontend()
-        logging.info(f"[SmartsheetSync] Indexed destination rows (Row='Engineering'): {len(dest_index)}")
+        logging.info(f"[SmartsheetSync] Indexed destination rows (Row='Foundation'): {len(dest_index)}")
 
         inserts, updates = build_operations(source_rows, dest_index)
         logging.info(f"[SmartsheetSync] Plan => inserts: {len(inserts)} | updates: {len(updates)}")
@@ -367,11 +363,11 @@ def main(mytimer: func.TimerRequest) -> None:
             logging.warning("[SmartsheetSync] DRY_RUN mode ON – no changes will be written.")
         else:
             bulk_insert(inserts)
-            bulk_update(updates)
+            bulk_update(updates) 
             logging.info("[SmartsheetSync] Changes committed to Smartsheet.")
 
         save_last_run(start_ts)
         logging.info("[SmartsheetSync] Done.")
     except Exception as ex:
-        logging.exception(f"[identity-engineering-sync] FAILED: {ex}")
+        logging.exception(f"[identity-foundation-sync] FAILED: {ex}")
         raise
