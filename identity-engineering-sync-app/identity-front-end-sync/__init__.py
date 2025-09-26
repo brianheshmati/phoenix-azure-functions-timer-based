@@ -35,11 +35,17 @@ DEST_SHEET_ID   = 4814574961250180  # hardcoded
 SRC_TANK_COL        = 3633417232797572
 SRC_ROW_COL         = 537192488980356
 SRC_ORDER_COL       = 8699966813589380 # columnId for "Order" here
-SRC_FRONTEND_COL = 5744479558127492
+SRC_SEARCH_COL = 5744479558127492 # columnId for "Front-End - Site Work" here
+SRC_NTP_DATE_COL  = 3844523465330564
+SRC_CONTRACT_DAYS_COL = 8348123092701060
+SRC_NTP_COMPLETION_DATE_COL = 1029773698224004
 
 # Destination column IDs
 DEST_TANK_COL = 492931382988676
 DEST_ROW_COL  = 5102084126625668
+DEST_NTP_DATE_COL  = 1055881336409988
+DEST_CONTRACT_DAYS_COL = 5559480963780484
+DEST_NTP_COMPLETION_DATE_COL = 3307681150095236
 
 ROW_VALUE_PROJECT     = "Project"
 ROW_VALUE_FRONTEND = "Front-End - Site Work"
@@ -132,13 +138,13 @@ def ss_get(url: str, params: Dict[str, Any] = None) -> requests.Response:
 
 def ss_post(url: str, body: Any) -> requests.Response:
     resp = requests.post(url, headers=HEADERS, data=json.dumps(body), timeout=60)
-    logging.info(f"Smartsheet POST {url}, response: {resp.json()}")
+    logging.info(f"Smartsheet POST {url}, request: {body} response: {resp.json()}")
     resp.raise_for_status()
     return resp
 
 def ss_put(url: str, body: Any) -> requests.Response:
     resp = requests.put(url, headers=HEADERS, data=json.dumps(body), timeout=60)
-    logging.info(f"Smartsheet PUT {url}, response: {resp.json()}")   
+    logging.info(f"Smartsheet PUT {url}, request: {body}, response: {resp.json()}")   
     resp.raise_for_status()
     return resp
 
@@ -212,7 +218,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
         scells = cells_array_to_dict(row.get("cells", []))
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
-        src_frontend_val = str((scells.get(SRC_FRONTEND_COL) or {}).get("value") or "").strip()
+        src_frontend_val = str((scells.get(SRC_SEARCH_COL) or {}).get("value") or "").strip()
         if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_frontend_val == "Phoenix" or src_frontend_val == "Subcontractor"):
             rows.append(row)
     # if len(batch) < page_size:
@@ -276,7 +282,10 @@ def build_operations(
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_tank_val  =     (scells.get(SRC_TANK_COL)  or {}).get("value")
-        src_frontend_val = str((scells.get(SRC_FRONTEND_COL) or {}).get("value") or "").strip()
+        src_frontend_val = str((scells.get(SRC_SEARCH_COL) or {}).get("value") or "").strip()
+        src_ntp_date_val = scells.get(SRC_NTP_DATE_COL, {}).get("value")
+        src_contract_days_val = scells.get(SRC_CONTRACT_DAYS_COL, {}).get("value")
+        src_ntp_completion_date_val = scells.get(SRC_NTP_COMPLETION_DATE_COL, {}).get("value")
 
         # Must be a Project row
         if src_frontend_val != src_row_val != ROW_VALUE_PROJECT or src_order_val != ORDER_VALUE_PROJECT:
@@ -300,7 +309,6 @@ def build_operations(
             if src_frontend_val == "Subcontractor" or src_frontend_val == "Phoenix":
                 mapped_cells.append({"columnId": 1618831289831300, "value": "Front-End - Site Work"})        # Primary column
                 mapped_cells.append({"columnId": 598484499255172, "value": "0002 - Front-End - Site Work"}) # Order
-                #mapped_cells.append({"columnId": 5102084126625668, "value": "Front-End - Site Work"})        # Row
                 inserts.append({"toBottom": True, "cells": mapped_cells})
                 logging.info(f"[Plan] INSERT tank={tank_key} (Front-End - Site Work=Phoenix or Subcontractor)")
             else:
@@ -308,12 +316,23 @@ def build_operations(
         else:
             # UPDATE always if there are diffs
             dest_cells = cells_array_to_dict(dest_row.get("cells", []))
-            diffs = find_column_diffs(scells, dest_cells, src_titles, dest_titles)
-            if diffs:
-                updates.append({"id": dest_row["id"], "cells": mapped_cells})
-                logging.info(f"[Plan] UPDATE tank={tank_key} – diffs: {', '.join(diffs)}")
-            else:
-                logging.info(f"[Plan] SKIP update tank={tank_key} (no differences)")
+            if(src_frontend_val != dest_cells.get(DEST_ROW_COL, {}).get("value")):
+                mapped_cells.append({"columnId": 1052563474173828, "value": src_frontend_val})      # update the front end column on 04 sheet with the value from 02 sheet
+
+            if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
+                mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": DEST_CONTRACT_DAYS_COL, "value": src_contract_days_val})      # update the Contract Days column on 04 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": DEST_NTP_COMPLETION_DATE_COL, "value": src_ntp_completion_date_val})      # update the NTP Completion Date column on 04 sheet with the value from 02 sheet
+            
+            if mapped_cells:
+                updates.append({"id": dest_row["id"], "cells": mapped_cells})    
+                logging.info(f"[Plan] UPDATE tank={tank_key} (Ground Improvements = Required)")
+            # diffs = find_column_diffs(scells, dest_cells, src_titles, dest_titles)
+            # if diffs:
+            #     updates.append({"id": dest_row["id"], "cells": mapped_cells})
+            #     logging.info(f"[Plan] UPDATE tank={tank_key} – diffs: {', '.join(diffs)}")
+            # else:
+            #     logging.info(f"[Plan] SKIP update tank={tank_key} (no differences)")
 
     return inserts, updates
 

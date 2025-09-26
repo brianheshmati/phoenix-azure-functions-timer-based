@@ -36,10 +36,16 @@ SRC_TANK_COL        = 3633417232797572
 SRC_ROW_COL         = 537192488980356
 SRC_ORDER_COL       = 8699966813589380 # columnId for "Order" here
 SRC_DEEP_FOUNDATION_COL = 677929977335684
+SRC_NTP_DATE_COL  = 3844523465330564
+SRC_CONTRACT_DAYS_COL = 8348123092701060
+SRC_NTP_COMPLETION_DATE_COL = 1029773698224004
 
 # Destination column IDs
 DEST_TANK_COL = 492931382988676
 DEST_ROW_COL  = 5102084126625668
+DEST_NTP_DATE_COL  = 1055881336409988
+DEST_CONTRACT_DAYS_COL = 5559480963780484
+DEST_NTP_COMPLETION_DATE_COL = 3307681150095236
 
 ROW_VALUE_PROJECT     = "Project"
 ROW_VALUE_DEEP_FOUNDATION = "Deep Foundation"
@@ -62,8 +68,6 @@ IDENTITY_FOUNDATION_COLUMN_MAP : Dict[int, int] = {
     4407473418751876: 6790933986889604,  # Engineering firm
     8911073046122372: 1161434452676484,  # Owner
     1381617419112324: 7916833893732228,  # Bid #
-    5744479558127492: 6685380870623108,  # Front-End - Site Work
-
 }
 
 COLUMN_MAP: Dict[int, int] = {int(k): int(v) for k, v in IDENTITY_FOUNDATION_COLUMN_MAP.items()}
@@ -277,6 +281,9 @@ def build_operations(
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_tank_val  =     (scells.get(SRC_TANK_COL)  or {}).get("value")
         src_deep_foundation_val = str((scells.get(SRC_DEEP_FOUNDATION_COL) or {}).get("value") or "").strip()
+        src_ntp_date_val = scells.get(SRC_NTP_DATE_COL, {}).get("value")
+        src_contract_days_val = scells.get(SRC_CONTRACT_DAYS_COL, {}).get("value")
+        src_ntp_completion_date_val = scells.get(SRC_NTP_COMPLETION_DATE_COL, {}).get("value")
 
         # Must be a Project row
         if src_deep_foundation_val != src_row_val != ROW_VALUE_PROJECT or src_order_val != ORDER_VALUE_PROJECT:
@@ -292,14 +299,15 @@ def build_operations(
         for src_col, dest_col in COLUMN_MAP.items():
             if src_col in scells:
                 mapped_cells.append({"columnId": dest_col, "value": scells[src_col].get("value")})
-        # Force Row column in destination to "Deep Foundation"
-        mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_DEEP_FOUNDATION})
 
         if dest_row is None:
             # INSERT only if source "Ground Foundation" = "Required"
             if src_deep_foundation_val == "Required":
                 mapped_cells.append({"columnId": 1618831289831300, "value": "Deep Foundation"})        # Primary column
                 mapped_cells.append({"columnId": 598484499255172, "value": "0004 - Deep Foundation"}) # Order
+                # Force Row column in destination to "Deep Foundation"
+                mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_DEEP_FOUNDATION})
+
                 inserts.append({"toBottom": True, "cells": mapped_cells})
                 logging.info(f"[Plan] INSERT tank={tank_key} (Deep Foundation = Required)")
             else:
@@ -307,12 +315,29 @@ def build_operations(
         else:
             # UPDATE always if there are diffs
             dest_cells = cells_array_to_dict(dest_row.get("cells", []))
-            diffs = find_column_diffs(scells, dest_cells, src_titles, dest_titles)
-            if diffs:
+            if(src_deep_foundation_val == "Required"):
+                mapped_cells.append({"columnId": 5556163101544324, "value": src_deep_foundation_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
+                
+            if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
+                mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": DEST_CONTRACT_DAYS_COL, "value": src_contract_days_val})      # update the Contract Days column on 04 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": DEST_NTP_COMPLETION_DATE_COL, "value": src_ntp_completion_date_val})      # update the NTP Completion Date column on 04 sheet with the value from 02 sheet
+            
+            if mapped_cells:
                 updates.append({"id": dest_row["id"], "cells": mapped_cells})
-                logging.info(f"[Plan] UPDATE tank={tank_key} – diffs: {', '.join(diffs)}")
-            else:
-                logging.info(f"[Plan] SKIP update tank={tank_key} (no differences)")
+
+            # if(src_deep_foundation_val == "Not Required"):
+            #     mapped_cells.append({"columnId": 5556163101544324, "value": src_deep_foundation_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
+                
+            #     updates.append({"id": dest_row["id"], "cells": mapped_cells})
+            #     logging.info(f"[Plan] UPDATE tank={tank_key} (Deep Foundation = Not Required)")
+
+            # diffs = find_column_diffs(scells, dest_cells, src_titles, dest_titles)
+            # if diffs:
+            #     updates.append({"id": dest_row["id"], "cells": mapped_cells})
+            #     logging.info(f"[Plan] UPDATE tank={tank_key} – diffs: {', '.join(diffs)}")
+            # else:
+            #     logging.info(f"[Plan] SKIP update tank={tank_key} (no differences)")
 
     return inserts, updates
 
