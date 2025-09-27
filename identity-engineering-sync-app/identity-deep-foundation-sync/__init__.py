@@ -12,6 +12,7 @@ import azure.functions as func
 import requests
 from dateutil import tz
 from azure.storage.blob import BlobServiceClient
+from collections import defaultdict
 
 # ---------- Config ----------
 SS_API_BASE = "https://api.smartsheet.com/2.0"
@@ -35,7 +36,7 @@ DEST_SHEET_ID   = 4814574961250180  # hardcoded
 SRC_TANK_COL        = 3633417232797572
 SRC_ROW_COL         = 537192488980356
 SRC_ORDER_COL       = 8699966813589380 # columnId for "Order" here
-SRC_DEEP_FOUNDATION_COL = 677929977335684
+SRC_DEEP_FOUNDATION_COL = 677929977335684 # Deep Foundation column on 02 sheet
 SRC_NTP_DATE_COL  = 3844523465330564
 SRC_CONTRACT_DAYS_COL = 8348123092701060
 SRC_NTP_COMPLETION_DATE_COL = 1029773698224004
@@ -46,6 +47,7 @@ DEST_ROW_COL  = 5102084126625668
 DEST_NTP_DATE_COL  = 1055881336409988
 DEST_CONTRACT_DAYS_COL = 5559480963780484
 DEST_NTP_COMPLETION_DATE_COL = 3307681150095236
+DEST_DEEP_FOUNDATION_COL = 5556163101544324 # Deep Foundation column on 04 sheet
 
 ROW_VALUE_PROJECT     = "Project"
 ROW_VALUE_DEEP_FOUNDATION = "Deep Foundation"
@@ -136,15 +138,33 @@ def ss_get(url: str, params: Dict[str, Any] = None) -> requests.Response:
 
 def ss_post(url: str, body: Any) -> requests.Response:
     resp = requests.post(url, headers=HEADERS, data=json.dumps(body), timeout=60)
-    logging.info(f"Smartsheet POST {url}, response: {resp.json()}")
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Smartsheet POST {url} failed: {e}, response: {resp.text}")
+        # You can either re-raise (to stop), or return resp anyway
+        # raise
+        return resp  # <- if you want the caller to decide
+
+    logging.info(f"Smartsheet POST {url}, body: {body}, response: {resp.json()}")
     return resp
+    # logging.info(f"Smartsheet POST {url}, body: {body}, response: {resp.json()}")
+    # resp.raise_for_status()
+    # return resp
 
 def ss_put(url: str, body: Any) -> requests.Response:
     resp = requests.put(url, headers=HEADERS, data=json.dumps(body), timeout=60)
-    logging.info(f"Smartsheet PUT {url}, response: {resp.json()}")   
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Smartsheet PUT {url} failed: {e}, response: {resp.text}")
+        return resp  # still return so caller can inspect the response
+
+    logging.info(f"Smartsheet PUT {url}, body: {body}, response: {resp.json()}")
     return resp
+    # logging.info(f"Smartsheet PUT {url}, body: {body}") #, response: {resp.json()}")   
+    # resp.raise_for_status()
+    # return resp
 
 def cells_array_to_dict(cells: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
     out = {}
@@ -198,7 +218,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
     page = 1
     page_size = 500
 
-    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}' and  Deep Foundation='Required'")
+    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}' and  Deep Foundation not blank")
 
     #while True:
     url = f"{SS_API_BASE}/sheets/{SOURCE_SHEET_ID}"
@@ -217,19 +237,20 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_deep_foundation_val = str((scells.get(SRC_DEEP_FOUNDATION_COL) or {}).get("value") or "").strip()
-        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_deep_foundation_val == "Required"):
+        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_deep_foundation_val != ""):
             rows.append(row)
     # if len(batch) < page_size:
     #     break
     page += 1
     return rows
 
-def index_dest_by_tank_and_frontend() -> Dict[str, Dict[str, Any]]:
+def index_dest_by_tank_and_row() -> Dict[str, Dict[str, Any]]:
     """
-    Index destination (Foundation) rows by Tank#'.
-    Uses the correct list endpoint: GET /sheets/{sheetId} with paging.
+    Index destination rows by Tank#, but keep ALL rows per tank in a list.
+    We only include rows whose 'Row' column is 'Deep Foundation' so
+    later filtering by DEST_ROW_COL is trivial or unnecessary.
     """
-    idx: Dict[str, Dict[str, Any]] = {}
+    idx: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     page = 1
     page_size = 500
     while True:
@@ -243,11 +264,11 @@ def index_dest_by_tank_and_frontend() -> Dict[str, Dict[str, Any]]:
             row_val  = str((cdict.get(DEST_ROW_COL)  or {}).get("value") or "").strip()
             tank_val =     (cdict.get(DEST_TANK_COL) or {}).get("value")
             if row_val == ROW_VALUE_DEEP_FOUNDATION and tank_val not in (None, ""):
-                idx[str(tank_val).strip()] = row
+                idx[str(tank_val).strip()].append(row)
         if len(batch) < page_size:
             break
         page += 1
-    return idx
+    return dict(idx)
 
 # ---------- Diff / Planning ----------
 def find_column_diffs(
@@ -277,62 +298,82 @@ def build_operations(
 
     for srow in source_rows:
         scells = cells_array_to_dict(srow.get("cells", []))
+        # logging.info(f"[Plan] Source row: {scells}")
+        
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_tank_val  =     (scells.get(SRC_TANK_COL)  or {}).get("value")
         src_deep_foundation_val = str((scells.get(SRC_DEEP_FOUNDATION_COL) or {}).get("value") or "").strip()
-        src_ntp_date_val = scells.get(SRC_NTP_DATE_COL, {}).get("value")
-        src_contract_days_val = scells.get(SRC_CONTRACT_DAYS_COL, {}).get("value")
-        src_ntp_completion_date_val = scells.get(SRC_NTP_COMPLETION_DATE_COL, {}).get("value")
+        src_ntp_date_val = (scells.get(SRC_NTP_DATE_COL) or {}).get("value")
+        src_contract_days_val = (scells.get(SRC_CONTRACT_DAYS_COL) or {}).get("value")
+        src_ntp_completion_date_val = (scells.get(SRC_NTP_COMPLETION_DATE_COL) or {}).get("value")
 
         # Must be a Project row
-        if src_deep_foundation_val != src_row_val != ROW_VALUE_PROJECT or src_order_val != ORDER_VALUE_PROJECT:
+        if src_row_val != ROW_VALUE_PROJECT or src_order_val != ORDER_VALUE_PROJECT:
             continue
         if src_tank_val in (None, ""):
             continue
 
         tank_key = str(src_tank_val).strip()
-        dest_row = dest_index.get(tank_key)
 
-        # Build mapped cell payload
+        candidates = dest_index.get(tank_key, [])
+        if isinstance(candidates, dict):
+            candidates = [candidates]
+
+        # logging.info(f"[Plan] Candidates {candidates}")
+
+        dest_row = None
+        for row in candidates:
+            cdict = cells_array_to_dict(row.get("cells", []))
+            val = (cdict.get(DEST_ROW_COL) or {}).get("value")
+            if val == ROW_VALUE_DEEP_FOUNDATION:   # all indexed rows should already match
+                dest_row = row
+                break
+        
+        logging.info(f"[Plan] Processing tank={tank_key}: dest_row found={dest_row is not None}")
+
+        dest_cells = cells_array_to_dict(dest_row.get("cells", [])) if dest_row else {}
+        
+        dest_deep_foundation_val = dest_cells.get(DEST_DEEP_FOUNDATION_COL, {}).get('value')
+        
         mapped_cells: List[Dict[str, Any]] = []
-        for src_col, dest_col in COLUMN_MAP.items():
-            if src_col in scells:
-                mapped_cells.append({"columnId": dest_col, "value": scells[src_col].get("value")})
-
+        
         if dest_row is None:
-            # INSERT only if source "Ground Foundation" = "Required"
+            # INSERT only if source "Deep Fundation" = "Required"
             if src_deep_foundation_val == "Required":
-                mapped_cells.append({"columnId": 1618831289831300, "value": "Deep Foundation"})        # Primary column
+                 # Build mapped cell payload        
+                for src_col, dest_col in COLUMN_MAP.items():
+                    if src_col in scells:
+                        mapped_cells.append({"columnId": dest_col, "value": scells[src_col].get("value")})
+                
+                mapped_cells.append({"columnId": 1618831289831300, "value": ROW_VALUE_DEEP_FOUNDATION}) # Primary column
                 mapped_cells.append({"columnId": 598484499255172, "value": "0004 - Deep Foundation"}) # Order
-                # Force Row column in destination to "Deep Foundation"
+                # Force Row column in destination to Deep Foundation"
                 mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_DEEP_FOUNDATION})
+                mapped_cells.append({"columnId": DEST_DEEP_FOUNDATION_COL, "value": "Required"})      # Deep Foundation column on 04 sheet with the value from 02 sheet
 
                 inserts.append({"toBottom": True, "cells": mapped_cells})
                 logging.info(f"[Plan] INSERT tank={tank_key} (Deep Foundation = Required)")
             else:
-                logging.info(f"[Plan] SKIP insert tank={tank_key} (Deep Foundation = {src_deep_foundation_val})")
+                logging.info(f"[Plan] SKIP insert tank={tank_key} (Deep Fundation = {src_deep_foundation_val})")
         else:
             # UPDATE always if there are diffs
-            dest_cells = cells_array_to_dict(dest_row.get("cells", []))
-            if(src_deep_foundation_val == "Required"):
-                mapped_cells.append({"columnId": 5556163101544324, "value": src_deep_foundation_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
-                
+            
+            dest_deep_foundation_val = dest_cells.get(DEST_DEEP_FOUNDATION_COL, {}).get('value')
+            
+            if(src_deep_foundation_val != "" and src_deep_foundation_val != dest_deep_foundation_val):
+                mapped_cells.append({"columnId": DEST_DEEP_FOUNDATION_COL, "value": src_deep_foundation_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
+                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Deep Foundation from {dest_deep_foundation_val} to {src_deep_foundation_val})")
+
             if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
                 mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet
                 mapped_cells.append({"columnId": DEST_CONTRACT_DAYS_COL, "value": src_contract_days_val})      # update the Contract Days column on 04 sheet with the value from 02 sheet
                 mapped_cells.append({"columnId": DEST_NTP_COMPLETION_DATE_COL, "value": src_ntp_completion_date_val})      # update the NTP Completion Date column on 04 sheet with the value from 02 sheet
-            
+                logging.info(f"[Plan] UPDATE tank={tank_key} (NTP Date = {src_ntp_date_val})")
+
             if mapped_cells:
                 updates.append({"id": dest_row["id"], "cells": mapped_cells})
 
-            # if(src_deep_foundation_val == "Not Required"):
-            #     mapped_cells.append({"columnId": 5556163101544324, "value": src_deep_foundation_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
-                
-            #     updates.append({"id": dest_row["id"], "cells": mapped_cells})
-            #     logging.info(f"[Plan] UPDATE tank={tank_key} (Deep Foundation = Not Required)")
-
-            # diffs = find_column_diffs(scells, dest_cells, src_titles, dest_titles)
             # if diffs:
             #     updates.append({"id": dest_row["id"], "cells": mapped_cells})
             #     logging.info(f"[Plan] UPDATE tank={tank_key} – diffs: {', '.join(diffs)}")
@@ -347,16 +388,29 @@ def bulk_insert(rows: List[Dict[str, Any]]):
         return
     url = f"{SS_API_BASE}/sheets/{DEST_SHEET_ID}/rows"
     for batch in chunked(rows, 500):
-        ss_post(url, batch)
-        logging.info(f"[SmartsheetSync] Inserted batch of {len(batch)} rows")
-
+        resp = ss_post(url, batch)
+        if resp.status_code >= 400:
+            logging.warning(f"[SmartsheetSync] Bulk insert failed for batch of {len(batch)} rows – retrying individually.")
+            for row in batch:
+                r = ss_post(url, [row])
+                if r.status_code >= 400:
+                    logging.error(f"[SmartsheetSync] Row insert failed: {row}, response={r.text}")
+        else:
+            logging.info(f"[SmartsheetSync] Inserted batch of {len(batch)} rows")
 def bulk_update(rows: List[Dict[str, Any]]):
     if not rows:
         return
     url = f"{SS_API_BASE}/sheets/{DEST_SHEET_ID}/rows"
     for batch in chunked(rows, 500):
-        ss_put(url, batch)
-        logging.info(f"[SmartsheetSync] Updated batch of {len(batch)} rows")
+        resp = ss_put(url, batch)
+        if resp.status_code >= 400:
+            logging.warning(f"[SmartsheetSync] Bulk update failed for batch of {len(batch)} rows – retrying individually.")
+            for row in batch:
+                r = ss_put(url, [row])
+                if r.status_code >= 400:
+                    logging.error(f"[SmartsheetSync] Row update failed: {row}, response={r.text}")
+        else:
+            logging.info(f"[SmartsheetSync] Updated batch of {len(batch)} rows")
 
 # ---------- Azure Function Entry ----------
 def main(mytimer: func.TimerRequest) -> None:
@@ -377,7 +431,7 @@ def main(mytimer: func.TimerRequest) -> None:
             logging.info("[SmartsheetSync] Nothing to do.")
             return
 
-        dest_index = index_dest_by_tank_and_frontend()
+        dest_index = index_dest_by_tank_and_row()
         logging.info(f"[SmartsheetSync] Indexed destination rows (Row='Foundation'): {len(dest_index)}")
 
         inserts, updates = build_operations(source_rows, dest_index)

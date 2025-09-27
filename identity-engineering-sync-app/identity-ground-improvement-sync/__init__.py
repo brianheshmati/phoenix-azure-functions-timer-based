@@ -138,15 +138,33 @@ def ss_get(url: str, params: Dict[str, Any] = None) -> requests.Response:
 
 def ss_post(url: str, body: Any) -> requests.Response:
     resp = requests.post(url, headers=HEADERS, data=json.dumps(body), timeout=60)
+    try:
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Smartsheet POST {url} failed: {e}, response: {resp.text}")
+        # You can either re-raise (to stop), or return resp anyway
+        # raise
+        return resp  # <- if you want the caller to decide
+
     logging.info(f"Smartsheet POST {url}, body: {body}, response: {resp.json()}")
-    resp.raise_for_status()
     return resp
+    # logging.info(f"Smartsheet POST {url}, body: {body}, response: {resp.json()}")
+    # resp.raise_for_status()
+    # return resp
 
 def ss_put(url: str, body: Any) -> requests.Response:
     resp = requests.put(url, headers=HEADERS, data=json.dumps(body), timeout=60)
-    logging.info(f"Smartsheet PUT {url}, body: {body}") #, response: {resp.json()}")   
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Smartsheet PUT {url} failed: {e}, response: {resp.text}")
+        return resp  # still return so caller can inspect the response
+
+    logging.info(f"Smartsheet PUT {url}, body: {body}, response: {resp.json()}")
     return resp
+    # logging.info(f"Smartsheet PUT {url}, body: {body}") #, response: {resp.json()}")   
+    # resp.raise_for_status()
+    # return resp
 
 def cells_array_to_dict(cells: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
     out = {}
@@ -302,7 +320,7 @@ def build_operations(
         if isinstance(candidates, dict):
             candidates = [candidates]
 
-        logging.info(f"[Plan] Candidates {candidates}")
+        # logging.info(f"[Plan] Candidates {candidates}")
 
         dest_row = None
         for row in candidates:
@@ -370,10 +388,39 @@ def bulk_insert(rows: List[Dict[str, Any]]):
         return
     url = f"{SS_API_BASE}/sheets/{DEST_SHEET_ID}/rows"
     for batch in chunked(rows, 500):
+        resp = ss_post(url, batch)
+        if resp.status_code >= 400:
+            logging.warning(f"[SmartsheetSync] Bulk insert failed for batch of {len(batch)} rows – retrying individually.")
+            for row in batch:
+                r = ss_post(url, [row])
+                if r.status_code >= 400:
+                    logging.error(f"[SmartsheetSync] Row insert failed: {row}, response={r.text}")
+        else:
+            logging.info(f"[SmartsheetSync] Inserted batch of {len(batch)} rows")
+def bulk_update(rows: List[Dict[str, Any]]):
+    if not rows:
+        return
+    url = f"{SS_API_BASE}/sheets/{DEST_SHEET_ID}/rows"
+    for batch in chunked(rows, 500):
+        resp = ss_put(url, batch)
+        if resp.status_code >= 400:
+            logging.warning(f"[SmartsheetSync] Bulk update failed for batch of {len(batch)} rows – retrying individually.")
+            for row in batch:
+                r = ss_put(url, [row])
+                if r.status_code >= 400:
+                    logging.error(f"[SmartsheetSync] Row update failed: {row}, response={r.text}")
+        else:
+            logging.info(f"[SmartsheetSync] Updated batch of {len(batch)} rows")
+
+def bulk_insert_old(rows: List[Dict[str, Any]]):
+    if not rows:
+        return
+    url = f"{SS_API_BASE}/sheets/{DEST_SHEET_ID}/rows"
+    for batch in chunked(rows, 500):
         ss_post(url, batch)
         logging.info(f"[SmartsheetSync] Inserted batch of {len(batch)} rows")
 
-def bulk_update(rows: List[Dict[str, Any]]):
+def bulk_update_old(rows: List[Dict[str, Any]]):
     if not rows:
         return
     url = f"{SS_API_BASE}/sheets/{DEST_SHEET_ID}/rows"
