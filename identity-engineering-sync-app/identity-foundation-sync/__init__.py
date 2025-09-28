@@ -36,7 +36,7 @@ DEST_SHEET_ID   = 4814574961250180  # hardcoded
 SRC_TANK_COL        = 3633417232797572
 SRC_ROW_COL         = 537192488980356
 SRC_ORDER_COL       = 8699966813589380 # columnId for "Order" here
-SRC_GROUND_IMPROVEMENTS_COL = 7996279371812740 # Ground Improvements column on 02 sheet
+SRC_FOUNDATION_COL = 1240879930756996 # Front End column on 02 sheet
 SRC_NTP_DATE_COL  = 3844523465330564
 SRC_CONTRACT_DAYS_COL = 8348123092701060
 SRC_NTP_COMPLETION_DATE_COL = 1029773698224004
@@ -47,10 +47,10 @@ DEST_ROW_COL  = 5102084126625668
 DEST_NTP_DATE_COL  = 1055881336409988
 DEST_CONTRACT_DAYS_COL = 5559480963780484
 DEST_NTP_COMPLETION_DATE_COL = 3307681150095236
-DEST_GROUND_IMPROVEMENTS_COL = 1052563474173828 # Ground Improvements column on 04 sheet
+DEST_FFOUNDATION_COL = 2494925161320324 # Foundation column on 04 sheet
 
 ROW_VALUE_PROJECT     = "Project"
-ROW_VALUE_GROUND_IMPROVEMENTS = "Ground Improvements"
+ROW_VALUE_FOUNDATION = "Foundation"
 ORDER_VALUE_PROJECT   = "0000 - Project"
 
 IDENTITY_FOUNDATION_COLUMN_MAP : Dict[int, int] = {
@@ -78,7 +78,7 @@ STATE_CONTAINER = os.environ.get("STATE_CONTAINER")
 STATE_BLOB      = os.environ.get("STATE_BLOB")
 BLOB_CS         = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
-DRY_RUN = os.getenv("DRY_RUN_GROUND_IMPROVEMENTS", "false").lower() == "true"
+DRY_RUN = os.getenv("DRY_RUN_FOUNDATION", "false").lower() == "true"
 
 HEADERS = {
     "Authorization": f"Bearer {SMARTSHEET_TOKEN}",
@@ -218,7 +218,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
     page = 1
     page_size = 500
 
-    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}' and  Ground Improvements not blank")
+    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}' and  Front End - Site Work not blank")
 
     #while True:
     url = f"{SS_API_BASE}/sheets/{SOURCE_SHEET_ID}"
@@ -236,8 +236,8 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
         scells = cells_array_to_dict(row.get("cells", []))
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
-        src_ground_improvements_val = str((scells.get(SRC_GROUND_IMPROVEMENTS_COL) or {}).get("value") or "").strip()
-        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_ground_improvements_val != ""):
+        src_foundation_val = str((scells.get(SRC_FOUNDATION_COL) or {}).get("value") or "").strip()
+        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_foundation_val != ""):
             rows.append(row)
     # if len(batch) < page_size:
     #     break
@@ -247,7 +247,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
 def index_dest_by_tank_and_row() -> Dict[str, Dict[str, Any]]:
     """
     Index destination rows by Tank#, but keep ALL rows per tank in a list.
-    We only include rows whose 'Row' column is 'Ground Improvements' so
+    We only include rows whose 'Row' column is 'Deep Foundation' so
     later filtering by DEST_ROW_COL is trivial or unnecessary.
     """
     idx: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -263,7 +263,7 @@ def index_dest_by_tank_and_row() -> Dict[str, Dict[str, Any]]:
             cdict = cells_array_to_dict(row.get("cells", []))
             row_val  = str((cdict.get(DEST_ROW_COL)  or {}).get("value") or "").strip()
             tank_val =     (cdict.get(DEST_TANK_COL) or {}).get("value")
-            if row_val == ROW_VALUE_GROUND_IMPROVEMENTS and tank_val not in (None, ""):
+            if row_val == ROW_VALUE_FOUNDATION and tank_val not in (None, ""):
                 idx[str(tank_val).strip()].append(row)
         if len(batch) < page_size:
             break
@@ -303,7 +303,7 @@ def build_operations(
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_tank_val  =     (scells.get(SRC_TANK_COL)  or {}).get("value")
-        src_ground_improvements_val = str((scells.get(SRC_GROUND_IMPROVEMENTS_COL) or {}).get("value") or "").strip()
+        src_foundation_val = str((scells.get(SRC_FOUNDATION_COL) or {}).get("value") or "").strip()
         src_ntp_date_val = (scells.get(SRC_NTP_DATE_COL) or {}).get("value")
         src_contract_days_val = (scells.get(SRC_CONTRACT_DAYS_COL) or {}).get("value")
         src_ntp_completion_date_val = (scells.get(SRC_NTP_COMPLETION_DATE_COL) or {}).get("value")
@@ -326,7 +326,7 @@ def build_operations(
         for row in candidates:
             cdict = cells_array_to_dict(row.get("cells", []))
             val = (cdict.get(DEST_ROW_COL) or {}).get("value")
-            if val == ROW_VALUE_GROUND_IMPROVEMENTS:   # all indexed rows should already match
+            if val == ROW_VALUE_FOUNDATION:   # all indexed rows should already match
                 dest_row = row
                 break
         
@@ -334,36 +334,36 @@ def build_operations(
 
         dest_cells = cells_array_to_dict(dest_row.get("cells", [])) if dest_row else {}
         
-        dest_ground_improvements_val = dest_cells.get(DEST_GROUND_IMPROVEMENTS_COL, {}).get('value')
+        dest_foundation_val = dest_cells.get(DEST_FFOUNDATION_COL, {}).get('value')
         
         mapped_cells: List[Dict[str, Any]] = []
         
         if dest_row is None:
-            # INSERT only if source "Ground Improvements" = "Required"
-            if src_ground_improvements_val == "Required":
+            # INSERT only if source "Foundation" is "Phoenix or Subcontractor"
+            if src_foundation_val == "Phoenix" or src_foundation_val == "Subcontractor":
                  # Build mapped cell payload        
                 for src_col, dest_col in COLUMN_MAP.items():
                     if src_col in scells:
                         mapped_cells.append({"columnId": dest_col, "value": scells[src_col].get("value")})
                 
-                mapped_cells.append({"columnId": 1618831289831300, "value": ROW_VALUE_GROUND_IMPROVEMENTS}) # Primary column
-                mapped_cells.append({"columnId": 598484499255172, "value": "0003 - Ground Improvements"}) # Order
-                # Force Row column in destination to "Ground Improvements"
-                mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_GROUND_IMPROVEMENTS})
-                mapped_cells.append({"columnId": DEST_GROUND_IMPROVEMENTS_COL, "value": "Required"})      # Ground Improvements column on 04 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": 1618831289831300, "value": ROW_VALUE_FOUNDATION}) # Primary column
+                mapped_cells.append({"columnId": 598484499255172, "value": "0005 - Foundation"}) # Order
+                # Force Row column in destination to Deep Foundation"
+                mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_FOUNDATION})
+                mapped_cells.append({"columnId": DEST_FFOUNDATION_COL, "value": src_foundation_val})      # Front End - Site Work column on 04 sheet with the value from 02 sheet
 
                 inserts.append({"toBottom": True, "cells": mapped_cells})
-                logging.info(f"[Plan] INSERT tank={tank_key} (Ground Improvements = Required)")
+                logging.info(f"[Plan] INSERT tank={tank_key} (Front End - Site Work = {src_foundation_val})")
             else:
-                logging.info(f"[Plan] SKIP insert tank={tank_key} (Ground Improvements = {src_ground_improvements_val})")
+                logging.info(f"[Plan] SKIP insert tank={tank_key} (Front End - Site Work = {src_foundation_val})")
         else:
             # UPDATE always if there are diffs
             
-            dest_ground_improvements_val = dest_cells.get(DEST_GROUND_IMPROVEMENTS_COL, {}).get('value')
+            dest_foundation_val = dest_cells.get(DEST_FFOUNDATION_COL, {}).get('value')
             
-            if(src_ground_improvements_val != "" and src_ground_improvements_val != dest_ground_improvements_val):
-                mapped_cells.append({"columnId": 1052563474173828, "value": src_ground_improvements_val})      # update the ground improvements column on 04 sheet with the value from 02 sheet
-                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Ground Improvements from {dest_ground_improvements_val} to {src_ground_improvements_val})")
+            if(src_foundation_val != "" and src_foundation_val != dest_foundation_val):
+                mapped_cells.append({"columnId": DEST_FFOUNDATION_COL, "value": src_foundation_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
+                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Front End from {dest_foundation_val} to {src_foundation_val})")
 
             if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
                 mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet
