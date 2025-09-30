@@ -45,7 +45,7 @@ SRC_NTP_COMPLETION_DATE_COL = 1029773698224004
 DEST_TANK_COL = 6836883015028612
 DEST_ROW_COL  = 6133195573251972
 DEST_NTP_DATE_COL  = 2896233341079428
-DEST_CONTRACT_DAYS_COL = 7399832968449924,
+DEST_CONTRACT_DAYS_COL = 7399832968449924
 DEST_NTP_COMPLETION_DATE_COL = 1770333434236804
 DEST_SHAFT_COL = 8525732875292548 # Shaft column on 05 sheet
 
@@ -160,7 +160,7 @@ def ss_put(url: str, body: Any) -> requests.Response:
         logging.error(f"Smartsheet PUT {url} failed: {e}, response: {resp.text}")
         return resp  # still return so caller can inspect the response
 
-    logging.info(f"Smartsheet PUT {url}, body: {body}, response: {resp.json()}")
+    logging.info(f"Smartsheet PUT {url}, response: {resp.json()}")
     return resp
     # logging.info(f"Smartsheet PUT {url}, body: {body}") #, response: {resp.json()}")   
     # resp.raise_for_status()
@@ -306,7 +306,11 @@ def build_operations(
         src_shaft_val = str((scells.get(SRC_SHAFT_COL) or {}).get("value") or "").strip()
         src_ntp_date_val = (scells.get(SRC_NTP_DATE_COL) or {}).get("value")
         src_contract_days_val = (scells.get(SRC_CONTRACT_DAYS_COL) or {}).get("value")
+        
+        logging.info(f"[Plan] Source row Tank={src_tank_val}, Shaft={src_shaft_val}, NTP Date={src_ntp_date_val}, Contract Days={src_contract_days_val}")
+
         src_ntp_completion_date_val = (scells.get(SRC_NTP_COMPLETION_DATE_COL) or {}).get("value")
+
 
         # Must be a Project row
         if src_row_val != ROW_VALUE_PROJECT or src_order_val != ORDER_VALUE_PROJECT:
@@ -330,7 +334,7 @@ def build_operations(
                 dest_row = row
                 break
         
-        logging.info(f"[Plan] Processing tank={tank_key}: dest_row found={dest_row is not None}")
+        #logging.info(f"[Plan] Processing tank={tank_key}: dest_row found={dest_row is not None}")
 
         dest_cells = cells_array_to_dict(dest_row.get("cells", [])) if dest_row else {}
         
