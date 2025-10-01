@@ -361,7 +361,7 @@ def build_operations(
             
             dest_ground_improvements_val = dest_cells.get(DEST_GROUND_IMPROVEMENTS_COL, {}).get('value')
             
-            if(src_ground_improvements_val != "" and src_ground_improvements_val != dest_ground_improvements_val):
+            if(src_ground_improvements_val != dest_ground_improvements_val):
                 mapped_cells.append({"columnId": 1052563474173828, "value": src_ground_improvements_val})      # update the ground improvements column on 04 sheet with the value from 02 sheet
                 logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Ground Improvements from {dest_ground_improvements_val} to {src_ground_improvements_val})")
 

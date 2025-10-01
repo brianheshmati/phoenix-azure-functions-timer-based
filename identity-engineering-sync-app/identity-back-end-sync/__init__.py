@@ -361,7 +361,7 @@ def build_operations(
             
             dest_back_end_val = dest_cells.get(DEST_BACK_END_COL, {}).get('value')
             
-            if(src_back_end_val != "" and src_back_end_val != dest_back_end_val):
+            if(src_back_end_val != dest_back_end_val):
                 mapped_cells.append({"columnId": DEST_BACK_END_COL, "value": src_back_end_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
                 logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Front End from {dest_back_end_val} to {src_back_end_val})")
 

@@ -365,7 +365,7 @@ def build_operations(
             
             dest_shaft_val = dest_cells.get(DEST_SHAFT_COL, {}).get('value')
             
-            if(src_shaft_val != "" and src_shaft_val != dest_shaft_val):
+            if(src_shaft_val != dest_shaft_val):
                 mapped_cells.append({"columnId": DEST_SHAFT_COL, "value": src_shaft_val})      # update the Shaft column on 05 sheet with the value from 02 sheet
                 logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Front End from {dest_shaft_val} to {src_shaft_val})")
 

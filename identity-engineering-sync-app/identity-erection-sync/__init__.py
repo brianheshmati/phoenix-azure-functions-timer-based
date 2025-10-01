@@ -49,8 +49,13 @@ DEST_CONTRACT_DAYS_COL = 5270942233874308
 DEST_NTP_COMPLETION_DATE_COL = 3019142420189060
 DEST_ERECTION_COL = 8296798233513860 # Erection column on 05 sheet
 
+DEST_PRIMARY_COL = 1330292559925124
+DEST_ORDER_COL   = 6115367164006276 # columnId for "Order"
+DEST_ORDER_COL_VALUE = "0007 - Erection"
+
+
 ROW_VALUE_PROJECT     = "Project"
-ROW_VALUE_ERECTION = "Erection"
+ROW_VALUE_ERECTION    = "Erection"
 ORDER_VALUE_PROJECT   = "0000 - Project"
 
 SRC_DEST_COLUMN_MAP : Dict[int, int] = {
@@ -350,8 +355,8 @@ def build_operations(
                     if src_col in scells:
                         mapped_cells.append({"columnId": dest_col, "value": scells[src_col].get("value")})
                 
-                mapped_cells.append({"columnId": 1330292559925124, "value": ROW_VALUE_ERECTION}) # Primary column
-                mapped_cells.append({"columnId": 6115367164006276, "value": "0007 - Erection"}) # Order
+                mapped_cells.append({"columnId": DEST_PRIMARY_COL, "value": ROW_VALUE_ERECTION}) # Primary column
+                mapped_cells.append({"columnId": DEST_ORDER_COL, "value": DEST_ORDER_COL_VALUE}) # Order
                 # Force Row column in destination to erection"
                 mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_ERECTION})
                 mapped_cells.append({"columnId": DEST_ERECTION_COL, "value": src_erection_val})  # Erection column on 06 sheet with the value from 02 sheet
