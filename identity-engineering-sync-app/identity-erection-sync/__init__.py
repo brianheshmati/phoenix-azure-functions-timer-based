@@ -30,46 +30,46 @@ def safe_int_env(key: str, default: int = None) -> int:
 
 SMARTSHEET_TOKEN = os.environ.get("SMARTSHEET_ACCESS_TOKEN")
 SOURCE_SHEET_ID = 639499383033732   # hardcoded
-DEST_SHEET_ID   = 5148656698085252  # hardcoded
+DEST_SHEET_ID   = 1936716945379204  # hardcoded
 
 # Source column IDs
 SRC_TANK_COL        = 3633417232797572
 SRC_ROW_COL         = 537192488980356
 SRC_ORDER_COL       = 8699966813589380 # columnId for "Order" here
-SRC_SHAFT_COL = 5181529604706180 # Shaft column on 02 sheet
+SRC_ERECTION_COL = 2929729791020932 # Erection column on 02 sheet
 SRC_NTP_DATE_COL  = 3844523465330564
 SRC_CONTRACT_DAYS_COL = 8348123092701060
 SRC_NTP_COMPLETION_DATE_COL = 1029773698224004
 
 # Destination column IDs
-DEST_TANK_COL = 6836883015028612
-DEST_ROW_COL  = 6133195573251972
-DEST_NTP_DATE_COL  = 2896233341079428
-DEST_CONTRACT_DAYS_COL = 7399832968449924
-DEST_NTP_COMPLETION_DATE_COL = 1770333434236804
-DEST_SHAFT_COL = 8525732875292548 # Shaft column on 05 sheet
+DEST_TANK_COL = 204392653082500
+DEST_ROW_COL  = 3863567350321028
+DEST_NTP_DATE_COL  = 767342606503812
+DEST_CONTRACT_DAYS_COL = 5270942233874308
+DEST_NTP_COMPLETION_DATE_COL = 3019142420189060
+DEST_ERECTION_COL = 8296798233513860 # Erection column on 05 sheet
 
 ROW_VALUE_PROJECT     = "Project"
-ROW_VALUE_SHAFT = "Shaft"
+ROW_VALUE_ERECTION = "Erection"
 ORDER_VALUE_PROJECT   = "0000 - Project"
 
 SRC_DEST_COLUMN_MAP : Dict[int, int] = {
-    3633417232797572: 6836883015028612,  # Tank #
-    8137016860168068: 1207383480815492,  # Site name
-    818667465691012:  5710983108185988,  # City
-    5322267093061508: 3459183294500740,  # State
-    2155673605066628: 644433527394180,  # Size
-    6659273232437124: 5148033154764676,  # Type
-    4618579651284868: 5992458084896644,   # Project manager
-    5885217046482820: 3740658271211396,  # Estimator
-    6448166999904132: 785171015749508,  # Contract date
-    3844523465330564: 2896233341079428,  # NTP date
-    8348123092701060: 7399832968449924,  # Contract days
-    1029773698224004: 1770333434236804,  # NTP completion date
-    5533373325594500: 6273933061607300,   # LDs
-    4407473418751876: 7118357991739268,  # Engineering firm
-    8911073046122372: 1488858457526148,  # Owner
-    1381617419112324: 8244257898581892,  # Bid #
+    3633417232797572: 204392653082500,  # Tank #
+    8137016860168068: 4707992280452996,  # Site name
+    818667465691012:  2456192466767748,  # City
+    5322267093061508: 6959792094138244,  # State
+    2155673605066628: 5833892187295620,  # Size
+    6659273232437124: 3582092373610372,  # Type
+    4618579651284868: 2737667443478404,   # Project manager
+    5885217046482820: 7241267070848900,  # Estimator
+    6448166999904132: 8085692000980868,  # Contract date
+    3844523465330564: 767342606503812,  # NTP date
+    8348123092701060: 5270942233874308,  # Contract days
+    1029773698224004: 3019142420189060,  # NTP completion date
+    5533373325594500: 7522742047559556,   # LDs
+    4407473418751876: 485867629793156,  # Engineering firm
+    8911073046122372: 4989467257163652,  # Owner
+    1381617419112324: 1611767536635780,  # Bid #
 }
 
 COLUMN_MAP: Dict[int, int] = {int(k): int(v) for k, v in SRC_DEST_COLUMN_MAP.items()}
@@ -78,7 +78,7 @@ STATE_CONTAINER = os.environ.get("STATE_CONTAINER")
 STATE_BLOB      = os.environ.get("STATE_BLOB")
 BLOB_CS         = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
-DRY_RUN = os.getenv("DRY_RUN_SHAFT_SCHEDULE", "false").lower() == "true"
+DRY_RUN = os.getenv("DRY_RUN_ERECTION", "false").lower() == "true"
 
 HEADERS = {
     "Authorization": f"Bearer {SMARTSHEET_TOKEN}",
@@ -146,7 +146,7 @@ def ss_post(url: str, body: Any) -> requests.Response:
         # raise
         return resp  # <- if you want the caller to decide
 
-    logging.info(f"Smartsheet POST {url}, body: {body}, response: {resp.json()}")
+    logging.info(f"Smartsheet POST {url}, response: {resp.json()}")
     return resp
     # logging.info(f"Smartsheet POST {url}, body: {body}, response: {resp.json()}")
     # resp.raise_for_status()
@@ -236,8 +236,8 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
         scells = cells_array_to_dict(row.get("cells", []))
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
-        src_shaft_val = str((scells.get(SRC_SHAFT_COL) or {}).get("value") or "").strip()
-        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_shaft_val != ""):
+        src_erection_val = str((scells.get(SRC_ERECTION_COL) or {}).get("value") or "").strip()
+        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_erection_val != ""):
             rows.append(row)
     # if len(batch) < page_size:
     #     break
@@ -247,7 +247,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
 def index_dest_by_tank_and_row() -> Dict[str, Dict[str, Any]]:
     """
     Index destination rows by Tank#, but keep ALL rows per tank in a list.
-    We only include rows whose 'Row' column is 'Shaft' so
+    We only include rows whose 'Row' column is 'Erection' so
     later filtering by DEST_ROW_COL is trivial or unnecessary.
     """
     idx: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -263,7 +263,7 @@ def index_dest_by_tank_and_row() -> Dict[str, Dict[str, Any]]:
             cdict = cells_array_to_dict(row.get("cells", []))
             row_val  = str((cdict.get(DEST_ROW_COL)  or {}).get("value") or "").strip()
             tank_val =     (cdict.get(DEST_TANK_COL) or {}).get("value")
-            if row_val == ROW_VALUE_SHAFT and tank_val not in (None, ""):
+            if row_val == ROW_VALUE_ERECTION and tank_val not in (None, ""):
                 idx[str(tank_val).strip()].append(row)
         if len(batch) < page_size:
             break
@@ -303,11 +303,11 @@ def build_operations(
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_tank_val  =     (scells.get(SRC_TANK_COL)  or {}).get("value")
-        src_shaft_val = str((scells.get(SRC_SHAFT_COL) or {}).get("value") or "").strip()
+        src_erection_val = str((scells.get(SRC_ERECTION_COL) or {}).get("value") or "").strip()
         src_ntp_date_val = (scells.get(SRC_NTP_DATE_COL) or {}).get("value")
         src_contract_days_val = (scells.get(SRC_CONTRACT_DAYS_COL) or {}).get("value")
         
-        logging.info(f"[Plan] Source row Tank={src_tank_val}, Shaft={src_shaft_val}, NTP Date={src_ntp_date_val}, Contract Days={src_contract_days_val}")
+        logging.info(f"[Plan] Source row Tank={src_tank_val}, Shaft={src_erection_val}, NTP Date={src_ntp_date_val}, Contract Days={src_contract_days_val}")
 
         src_ntp_completion_date_val = (scells.get(SRC_NTP_COMPLETION_DATE_COL) or {}).get("value")
 
@@ -330,7 +330,7 @@ def build_operations(
         for row in candidates:
             cdict = cells_array_to_dict(row.get("cells", []))
             val = (cdict.get(DEST_ROW_COL) or {}).get("value")
-            if val == ROW_VALUE_SHAFT:   # all indexed rows should already match
+            if val == ROW_VALUE_ERECTION:   # all indexed rows should already match
                 dest_row = row
                 break
         
@@ -338,36 +338,36 @@ def build_operations(
 
         dest_cells = cells_array_to_dict(dest_row.get("cells", [])) if dest_row else {}
         
-        dest_shaft_val = dest_cells.get(DEST_SHAFT_COL, {}).get('value')
+        dest_erection_val = dest_cells.get(DEST_ERECTION_COL, {}).get('value')
         
         mapped_cells: List[Dict[str, Any]] = []
         
         if dest_row is None:
-            # INSERT only if source "Front End - Site Work" is "Phoenix or Subcontractor"
-            if src_shaft_val == "Required":
+            # INSERT only if source "Erection" is "Required"
+            if src_erection_val == "Required":
                  # Build mapped cell payload        
                 for src_col, dest_col in COLUMN_MAP.items():
                     if src_col in scells:
                         mapped_cells.append({"columnId": dest_col, "value": scells[src_col].get("value")})
                 
-                mapped_cells.append({"columnId": 7962782921871236, "value": ROW_VALUE_SHAFT}) # Primary column
-                mapped_cells.append({"columnId": 1629595945881476, "value": "0006 - Shaft"}) # Order
-                # Force Row column in destination to Shaft"
-                mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_SHAFT})
-                mapped_cells.append({"columnId": DEST_SHAFT_COL, "value": src_shaft_val})      # Shaft column on 05 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": 1330292559925124, "value": ROW_VALUE_ERECTION}) # Primary column
+                mapped_cells.append({"columnId": 6115367164006276, "value": "0007 - Erection"}) # Order
+                # Force Row column in destination to erection"
+                mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_ERECTION})
+                mapped_cells.append({"columnId": DEST_ERECTION_COL, "value": src_erection_val})  # Erection column on 06 sheet with the value from 02 sheet
 
                 inserts.append({"toBottom": True, "cells": mapped_cells})
-                logging.info(f"[Plan] INSERT tank={tank_key} (Shaft = {src_shaft_val})")
+                logging.info(f"[Plan] INSERT tank={tank_key} (Shaft = {src_erection_val})")
             else:
-                logging.info(f"[Plan] SKIP insert tank={tank_key} (Shaft = {src_shaft_val})")
+                logging.info(f"[Plan] SKIP insert tank={tank_key} (Shaft = {src_erection_val})")
         else:
             # UPDATE always if there are diffs
             
-            dest_shaft_val = dest_cells.get(DEST_SHAFT_COL, {}).get('value')
+            dest_shaft_val = dest_cells.get(DEST_ERECTION_COL, {}).get('value')
             
-            if(src_shaft_val != "" and src_shaft_val != dest_shaft_val):
-                mapped_cells.append({"columnId": DEST_SHAFT_COL, "value": src_shaft_val})      # update the Shaft column on 05 sheet with the value from 02 sheet
-                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Front End from {dest_shaft_val} to {src_shaft_val})")
+            if(src_erection_val != "" and src_erection_val != dest_erection_val):
+                mapped_cells.append({"columnId": DEST_ERECTION_COL, "value": src_erection_val}) # update the Erection column on 06 sheet with the value from 02 sheet
+                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Front End from {dest_shaft_val} to {src_erection_val})")
 
             if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
                 mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet
@@ -451,5 +451,5 @@ def main(mytimer: func.TimerRequest) -> None:
         save_last_run(start_ts)
         logging.info("[SmartsheetSync] Done.")
     except Exception as ex:
-        logging.exception(f"[identity-shaft-sync] FAILED: {ex}")
+        logging.exception(f"[identity-erection-sync] FAILED: {ex}")
         raise
