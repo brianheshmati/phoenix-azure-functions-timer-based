@@ -82,7 +82,7 @@ STATE_CONTAINER = os.environ.get("STATE_CONTAINER")
 STATE_BLOB      = os.environ.get("STATE_BLOB")
 BLOB_CS         = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
-DRY_RUN = os.getenv("DRY_RUN_SHAFT_SCHEDULE", "false").lower() == "true"
+DRY_RUN = os.getenv("DRY_RUN_PAINT", "false").lower() == "true"
 
 HEADERS = {
     "Authorization": f"Bearer {SMARTSHEET_TOKEN}",
