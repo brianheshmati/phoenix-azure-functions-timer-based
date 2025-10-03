@@ -160,7 +160,7 @@ def ss_put(url: str, body: Any) -> requests.Response:
         logging.error(f"Smartsheet PUT {url} failed: {e}, response: {resp.text}")
         return resp  # still return so caller can inspect the response
 
-    logging.info(f"Smartsheet PUT {url}, body: {body}, response: {resp.json()}")
+    logging.info(f"Smartsheet PUT {url}, response: {resp.json()}")
     return resp
     # logging.info(f"Smartsheet PUT {url}, body: {body}") #, response: {resp.json()}")   
     # resp.raise_for_status()
@@ -237,7 +237,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_deep_foundation_val = str((scells.get(SRC_DEEP_FOUNDATION_COL) or {}).get("value") or "").strip()
-        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_deep_foundation_val != ""):
+        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT: # and (src_deep_foundation_val != ""):
             rows.append(row)
     # if len(batch) < page_size:
     #     break

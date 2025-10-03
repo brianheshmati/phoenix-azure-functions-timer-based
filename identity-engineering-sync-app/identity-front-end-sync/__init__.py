@@ -160,7 +160,7 @@ def ss_put(url: str, body: Any) -> requests.Response:
         logging.error(f"Smartsheet PUT {url} failed: {e}, response: {resp.text}")
         return resp  # still return so caller can inspect the response
 
-    logging.info(f"Smartsheet PUT {url}, body: {body}, response: {resp.json()}")
+    logging.info(f"Smartsheet PUT {url}, response: {resp.json()}")
     return resp
     # logging.info(f"Smartsheet PUT {url}, body: {body}") #, response: {resp.json()}")   
     # resp.raise_for_status()
@@ -218,7 +218,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
     page = 1
     page_size = 500
 
-    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}' and  Front End - Site Work not blank")
+    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}'")
 
     #while True:
     url = f"{SS_API_BASE}/sheets/{SOURCE_SHEET_ID}"
@@ -237,7 +237,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_front_end_val = str((scells.get(SRC_FRONT_END_COL) or {}).get("value") or "").strip()
-        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_front_end_val != ""):
+        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT: # and (src_front_end_val != ""):
             rows.append(row)
     # if len(batch) < page_size:
     #     break

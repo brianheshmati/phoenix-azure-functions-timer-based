@@ -218,7 +218,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
     page = 1
     page_size = 500
 
-    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}' and  Shaft not blank")
+    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}'")
 
     #while True:
     url = f"{SS_API_BASE}/sheets/{SOURCE_SHEET_ID}"
@@ -237,7 +237,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_shaft_val = str((scells.get(SRC_SHAFT_COL) or {}).get("value") or "").strip()
-        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT and (src_shaft_val != ""):
+        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT: # and (src_shaft_val != ""):
             rows.append(row)
     # if len(batch) < page_size:
     #     break
@@ -343,7 +343,7 @@ def build_operations(
         mapped_cells: List[Dict[str, Any]] = []
         
         if dest_row is None:
-            # INSERT only if source "Front End - Site Work" is "Phoenix or Subcontractor"
+            # INSERT only if source "Shaft" is "Phoenix or Subcontractor"
             if src_shaft_val == "Required":
                  # Build mapped cell payload        
                 for src_col, dest_col in COLUMN_MAP.items():
@@ -367,7 +367,7 @@ def build_operations(
             
             if(src_shaft_val != dest_shaft_val):
                 mapped_cells.append({"columnId": DEST_SHAFT_COL, "value": src_shaft_val})      # update the Shaft column on 05 sheet with the value from 02 sheet
-                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Front End from {dest_shaft_val} to {src_shaft_val})")
+                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Shaft from {dest_shaft_val} to {src_shaft_val})")
 
             if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
                 mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet

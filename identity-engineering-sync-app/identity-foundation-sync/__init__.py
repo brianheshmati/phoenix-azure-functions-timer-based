@@ -36,7 +36,7 @@ DEST_SHEET_ID   = 4814574961250180  # hardcoded
 SRC_TANK_COL        = 3633417232797572
 SRC_ROW_COL         = 537192488980356
 SRC_ORDER_COL       = 8699966813589380 # columnId for "Order" here
-SRC_FOUNDATION_COL = 1240879930756996 # Front End column on 02 sheet
+SRC_FOUNDATION_COL = 1240879930756996 # Foundation column on 02 sheet
 SRC_NTP_DATE_COL  = 3844523465330564
 SRC_CONTRACT_DAYS_COL = 8348123092701060
 SRC_NTP_COMPLETION_DATE_COL = 1029773698224004
@@ -47,7 +47,7 @@ DEST_ROW_COL  = 5102084126625668
 DEST_NTP_DATE_COL  = 1055881336409988
 DEST_CONTRACT_DAYS_COL = 5559480963780484
 DEST_NTP_COMPLETION_DATE_COL = 3307681150095236
-DEST_FFOUNDATION_COL = 2494925161320324 # Foundation column on 04 sheet
+DEST_FOUNDATION_COL = 2494925161320324 # Foundation column on 04 sheet
 
 ROW_VALUE_PROJECT     = "Project"
 ROW_VALUE_FOUNDATION = "Foundation"
@@ -160,7 +160,7 @@ def ss_put(url: str, body: Any) -> requests.Response:
         logging.error(f"Smartsheet PUT {url} failed: {e}, response: {resp.text}")
         return resp  # still return so caller can inspect the response
 
-    logging.info(f"Smartsheet PUT {url}, body: {body}, response: {resp.json()}")
+    logging.info(f"Smartsheet PUT {url}, response: {resp.json()}")
     return resp
     # logging.info(f"Smartsheet PUT {url}, body: {body}") #, response: {resp.json()}")   
     # resp.raise_for_status()
@@ -218,7 +218,7 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
     page = 1
     page_size = 500
 
-    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}' and  Front End - Site Work not blank")
+    logging.info(f"[SmartsheetSync] Fetching all source rows from sheet {SOURCE_SHEET_ID} with Row='{ROW_VALUE_PROJECT}' and Order='{ORDER_VALUE_PROJECT}'")
 
     #while True:
     url = f"{SS_API_BASE}/sheets/{SOURCE_SHEET_ID}"
@@ -334,7 +334,7 @@ def build_operations(
 
         dest_cells = cells_array_to_dict(dest_row.get("cells", [])) if dest_row else {}
         
-        dest_foundation_val = dest_cells.get(DEST_FFOUNDATION_COL, {}).get('value')
+        dest_foundation_val = dest_cells.get(DEST_FOUNDATION_COL, {}).get('value')
         
         mapped_cells: List[Dict[str, Any]] = []
         
@@ -350,20 +350,20 @@ def build_operations(
                 mapped_cells.append({"columnId": 598484499255172, "value": "0005 - Foundation"}) # Order
                 # Force Row column in destination to Deep Foundation"
                 mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_FOUNDATION})
-                mapped_cells.append({"columnId": DEST_FFOUNDATION_COL, "value": src_foundation_val})      # Front End - Site Work column on 04 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": DEST_FOUNDATION_COL, "value": src_foundation_val})      # FFoundation column on 04 sheet with the value from 02 sheet
 
                 inserts.append({"toBottom": True, "cells": mapped_cells})
-                logging.info(f"[Plan] INSERT tank={tank_key} (Front End - Site Work = {src_foundation_val})")
+                logging.info(f"[Plan] INSERT tank={tank_key} (Foundation = {src_foundation_val})")
             else:
-                logging.info(f"[Plan] SKIP insert tank={tank_key} (Front End - Site Work = {src_foundation_val})")
+                logging.info(f"[Plan] SKIP insert tank={tank_key} (Foundation = {src_foundation_val})")
         else:
             # UPDATE always if there are diffs
             
-            dest_foundation_val = dest_cells.get(DEST_FFOUNDATION_COL, {}).get('value')
+            dest_foundation_val = dest_cells.get(DEST_FOUNDATION_COL, {}).get('value')
             
             if(src_foundation_val != dest_foundation_val):
-                mapped_cells.append({"columnId": DEST_FFOUNDATION_COL, "value": src_foundation_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
-                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Front End from {dest_foundation_val} to {src_foundation_val})")
+                mapped_cells.append({"columnId": DEST_FOUNDATION_COL, "value": src_foundation_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
+                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Foundation from {dest_foundation_val} to {src_foundation_val})")
 
             if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
                 mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet
