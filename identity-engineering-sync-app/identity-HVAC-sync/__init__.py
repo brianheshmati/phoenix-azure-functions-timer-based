@@ -40,6 +40,7 @@ SRC_HVAC_COL = 3774154721152900 # HVAC Column on 02 sheet
 SRC_NTP_DATE_COL  = 3844523465330564
 SRC_CONTRACT_DAYS_COL = 8348123092701060
 SRC_NTP_COMPLETION_DATE_COL = 1029773698224004
+SRC_PROJECT_MANAGER_COL = 4618579651284868
 
 # Destination column IDs
 DEST_TANK_COL = 7584488200294276
@@ -51,6 +52,7 @@ DEST_HVAC_COL = 5640551642386308 # HVAC column on 09-Subcontracts sheet
 DEST_PRIMERY_COL = 8710388107136900 # Primary column on 09 sheet
 DEST_ORDER_COL = 6766451549228932 # Order column on 09 sheet
 DEST_ORDER_VAL = "0008 - HVAC"
+DEST_PROJECT_MANAGER_COL = 547613782527876
 
 
 ROW_VALUE_PROJECT     = "Project"
@@ -368,7 +370,9 @@ def build_operations(
             # UPDATE always if there are diffs
             
             dest_hvac_val = dest_cells.get(DEST_HVAC_COL, {}).get('value')
-            
+            src_project_manager_val = str((scells.get(SRC_PROJECT_MANAGER_COL) or {}).get("value") or "").strip()
+            dest_project_manager_val = dest_cells.get(DEST_PROJECT_MANAGER_COL, {}).get('value')
+
             if(src_hvac_val != dest_hvac_val):
                 mapped_cells.append({"columnId": DEST_HVAC_COL, "value": src_hvac_val}) # update the HVAC column on 09 sheet with the value from 02 sheet
                 logging.info(f"[Plan] UPDATE tank={tank_key} (Turning HVAC from {dest_hvac_val} to {src_hvac_val})")
@@ -378,6 +382,10 @@ def build_operations(
                 mapped_cells.append({"columnId": DEST_CONTRACT_DAYS_COL, "value": src_contract_days_val})      # update the Contract Days column on 09 sheet with the value from 02 sheet
                 mapped_cells.append({"columnId": DEST_NTP_COMPLETION_DATE_COL, "value": src_ntp_completion_date_val})      # update the NTP Completion Date column on 09 sheet with the value from 02 sheet
                 logging.info(f"[Plan] UPDATE tank={tank_key} (NTP Date = {src_ntp_date_val})")
+            
+            if(src_project_manager_val != dest_project_manager_val):
+                mapped_cells.append({"columnId": DEST_PROJECT_MANAGER_COL, "value": src_project_manager_val}) # update the Project Manager column on 09 sheet with the value from 02 sheet
+                logging.info(f"[Plan] UPDATE tank={tank_key} (Project Manager = {src_project_manager_val})")
 
             if mapped_cells:
                 updates.append({"id": dest_row["id"], "cells": mapped_cells})
