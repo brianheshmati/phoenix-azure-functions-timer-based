@@ -313,7 +313,7 @@ def build_operations(
         src_ntp_date_val = (scells.get(SRC_NTP_DATE_COL) or {}).get("value")
         src_contract_days_val = (scells.get(SRC_CONTRACT_DAYS_COL) or {}).get("value")
         
-        logging.info(f"[Plan] Source row Tank={src_tank_val}, Shaft={src_hvac_val}, NTP Date={src_ntp_date_val}, Contract Days={src_contract_days_val}")
+        logging.info(f"[Plan] Source row Tank={src_tank_val}, HVAC={src_hvac_val}, NTP Date={src_ntp_date_val}, Contract Days={src_contract_days_val}")
 
         src_ntp_completion_date_val = (scells.get(SRC_NTP_COMPLETION_DATE_COL) or {}).get("value")
 
@@ -358,7 +358,7 @@ def build_operations(
                 
                 mapped_cells.append({"columnId": DEST_PRIMERY_COL, "value": ROW_VALUE_HVAC}) # Primary column
                 mapped_cells.append({"columnId": DEST_ORDER_COL, "value": DEST_ORDER_VAL}) # Order
-                # Force Row column in destination to Shaft"
+                # Force Row column in destination to HVAC"
                 mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_HVAC})
                 mapped_cells.append({"columnId": DEST_HVAC_COL, "value": src_hvac_val}) # HVAC column on 09 sheet with the value from 02 sheet
 
@@ -463,5 +463,5 @@ def main(mytimer: func.TimerRequest) -> None:
         save_last_run(start_ts)
         logging.info("[SmartsheetSync] Done.")
     except Exception as ex:
-        logging.exception(f"[identity-shaft-sync] FAILED: {ex}")
+        logging.exception(f"[identity-HVAC-sync] FAILED: {ex}")
         raise
