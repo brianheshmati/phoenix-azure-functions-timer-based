@@ -349,8 +349,8 @@ def build_operations(
         mapped_cells: List[Dict[str, Any]] = []
         
         if dest_row is None:
-            # INSERT only if source "Electrical" is "Phoenix or Subcontractor"
-            if src_electrical_val == "Phoenix" or src_electrical_val == "Subcontractor":
+            # INSERT only if source "Electrical" is "Required or Subcontractor"
+            if src_electrical_val == "Required" or src_electrical_val == "Subcontractor":
                  # Build mapped cell payload        
                 for src_col, dest_col in COLUMN_MAP.items():
                     if src_col in scells:
