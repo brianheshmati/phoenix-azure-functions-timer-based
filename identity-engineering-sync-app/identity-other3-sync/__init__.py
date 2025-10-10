@@ -30,51 +30,51 @@ def safe_int_env(key: str, default: int = None) -> int:
 
 SMARTSHEET_TOKEN = os.environ.get("SMARTSHEET_ACCESS_TOKEN")
 SOURCE_SHEET_ID = 639499383033732   # 02-Identity Scope - hardcoded
-DEST_SHEET_ID   = 5695766275248004  # 07-Paint - hardcoded
+DEST_SHEET_ID   = 436476211842948  # 09-Subcontracts - hardcoded
 
 # Source column IDs
 SRC_TANK_COL        = 3633417232797572
 SRC_ROW_COL         = 537192488980356
 SRC_ORDER_COL       = 8699966813589380 # columnId for "Order" here
-SRC_PAINT_COL = 7433329418391428 # Paint column on 02 sheet
+SRC_O3_COL = 255717512269700 # OTHER 3 Column on 02 sheet
 SRC_NTP_DATE_COL  = 3844523465330564
 SRC_CONTRACT_DAYS_COL = 8348123092701060
 SRC_NTP_COMPLETION_DATE_COL = 1029773698224004
-SRC_PROJECT_MANAGER_COL = 4618579651284868  # Project manager column on 02 sheet
+SRC_PROJECT_MANAGER_COL = 4618579651284868
 
 # Destination column IDs
-DEST_TANK_COL = 5701751075983236
-DEST_ROW_COL  = 4294376192429956
-DEST_NTP_DATE_COL  = 4012901215719300
-DEST_CONTRACT_DAYS_COL = 8516500843089796
-DEST_NTP_COMPLETION_DATE_COL = 353726518480772
-DEST_PAINT_COL = 37067169681284 # Paint column on 07 sheet
-DEST_PRIMERY_COL = 5138801122561924 # Primary column on 07 sheet
-DEST_ORDER_COL = 6546176006115204 # Order column on 07 sheet
-DEST_PROJECT_MANAGER_COL = 2887001308876676 # Project manager column on DEST sheet
+DEST_TANK_COL = 7584488200294276
+DEST_ROW_COL  = 1136952015015812
+DEST_NTP_DATE_COL  = 1673513689370500
+DEST_CONTRACT_DAYS_COL = 6177113316740996
+DEST_NTP_COMPLETION_DATE_COL = 3925313503055748
+DEST_O3_COL = 292527084883844 # OTHER 3 column on 09-Subcontracts sheet
+DEST_PRIMERY_COL = 8710388107136900 # Primary column on 09 sheet
+DEST_ORDER_COL = 6766451549228932 # Order column on 09 sheet
+DEST_ORDER_VAL = "0013 - Other 3" # Order value for Other 3 rows on 09 sheet
+DEST_PROJECT_MANAGER_COL = 547613782527876
 
-DEST_ORDER_VAL = "0009 - Paint"
 ROW_VALUE_PROJECT     = "Project"
-ROW_VALUE_PAINT = "Paint"
+ROW_VALUE_O3 = "Other 3"  # Row value for Other 1 rows on 09 sheet
 ORDER_VALUE_PROJECT   = "0000 - Project"
 
 SRC_DEST_COLUMN_MAP : Dict[int, int] = {
-    3633417232797572: 5701751075983236,  # Tank #
-    8137016860168068: 3449951262297988,  # Site name
-    818667465691012:  7953550889668484,  # City
-    5322267093061508: 635201495191428,  # State
-    2155673605066628: 7390600936247172,  # Size
-    6659273232437124: 1761101402034052,  # Type
-    4618579651284868: 2887001308876676,   # Project manager
-    5885217046482820: 3168476285587332,  # Estimator
-    6448166999904132: 6264701029404548,  # Contract date
-    3844523465330564: 4012901215719300,  # NTP date
-    8348123092701060: 8516500843089796,  # Contract days
-    1029773698224004: 353726518480772,  # NTP completion date
-    5533373325594500: 4857326145851268,   # LDs
-    4407473418751876: 916676471902084,  # Engineering firm
-    8911073046122372: 5420276099272580,  # Owner
-    1381617419112324: 7672075912957828,  # Bid #
+    3633417232797572: 7584488200294276,  # Tank #
+    8137016860168068: 1954988666081156,  # Site name
+    818667465691012:  6458588293451652,  # City
+    5322267093061508: 4206788479766404,  # State
+    2155673605066628: 5051213409898372,  # Size
+    6659273232437124: 2799413596213124,  # Type
+    4618579651284868: 547613782527876,   # Project manager
+    5885217046482820: 11052108173188,  # Estimator
+    6448166999904132: 7303013223583620,  # Contract - date
+    3844523465330564: 1673513689370500,  # NTP date
+    8348123092701060: 6177113316740996,  # Contract days
+    1029773698224004: 3925313503055748,  # NTP completion date
+    5533373325594500: 8428913130426244,   # LDs
+    4407473418751876: 4488263456477060,  # Engineering firm
+    8911073046122372: 8991863083847556,  # Owner
+    1381617419112324: 4514651735543684,  # Bid #
 }
 
 COLUMN_MAP: Dict[int, int] = {int(k): int(v) for k, v in SRC_DEST_COLUMN_MAP.items()}
@@ -83,7 +83,7 @@ STATE_CONTAINER = os.environ.get("STATE_CONTAINER")
 STATE_BLOB      = os.environ.get("STATE_BLOB")
 BLOB_CS         = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
-DRY_RUN = os.getenv("DRY_RUN_PAINT", "false").lower() == "true"
+DRY_RUN = os.getenv("DRY_RUN_O3", "false").lower() == "true"
 
 HEADERS = {
     "Authorization": f"Bearer {SMARTSHEET_TOKEN}",
@@ -241,8 +241,8 @@ def list_all_source_project_rows() -> List[Dict[str, Any]]:
         scells = cells_array_to_dict(row.get("cells", []))
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
-        
-        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT:
+        #src_shaft_val = str((scells.get(SRC_PAINT_COL) or {}).get("value") or "").strip()
+        if src_row_val == ROW_VALUE_PROJECT and src_order_val == ORDER_VALUE_PROJECT: # and (src_shaft_val != ""):
             rows.append(row)
     # if len(batch) < page_size:
     #     break
@@ -268,7 +268,7 @@ def index_dest_by_tank_and_row() -> Dict[str, Dict[str, Any]]:
             cdict = cells_array_to_dict(row.get("cells", []))
             row_val  = str((cdict.get(DEST_ROW_COL)  or {}).get("value") or "").strip()
             tank_val =     (cdict.get(DEST_TANK_COL) or {}).get("value")
-            if row_val == ROW_VALUE_PAINT and tank_val not in (None, ""):
+            if row_val == ROW_VALUE_O3 and tank_val not in (None, ""):
                 idx[str(tank_val).strip()].append(row)
         if len(batch) < page_size:
             break
@@ -308,11 +308,11 @@ def build_operations(
         src_row_val   = str((scells.get(SRC_ROW_COL)   or {}).get("value") or "").strip()
         src_order_val = str((scells.get(SRC_ORDER_COL) or {}).get("value") or "").strip()
         src_tank_val  =     (scells.get(SRC_TANK_COL)  or {}).get("value")
-        src_paint_val = str((scells.get(SRC_PAINT_COL) or {}).get("value") or "").strip()
+        src_o3_val = str((scells.get(SRC_O3_COL) or {}).get("value") or "").strip()
         src_ntp_date_val = (scells.get(SRC_NTP_DATE_COL) or {}).get("value")
         src_contract_days_val = (scells.get(SRC_CONTRACT_DAYS_COL) or {}).get("value")
         
-        logging.info(f"[Plan] Source row Tank={src_tank_val}, Paint={src_paint_val}, NTP Date={src_ntp_date_val}, Contract Days={src_contract_days_val}")
+        logging.info(f"[Plan] Source row Tank={src_tank_val}, CP={src_o3_val}, NTP Date={src_ntp_date_val}, Contract Days={src_contract_days_val}")
 
         src_ntp_completion_date_val = (scells.get(SRC_NTP_COMPLETION_DATE_COL) or {}).get("value")
 
@@ -335,7 +335,7 @@ def build_operations(
         for row in candidates:
             cdict = cells_array_to_dict(row.get("cells", []))
             val = (cdict.get(DEST_ROW_COL) or {}).get("value")
-            if val == ROW_VALUE_PAINT:   # all indexed rows should already match
+            if val == ROW_VALUE_O3:   # all indexed rows should already match
                 dest_row = row
                 break
         
@@ -343,48 +343,48 @@ def build_operations(
 
         dest_cells = cells_array_to_dict(dest_row.get("cells", [])) if dest_row else {}
         
-        dest_paint_val = dest_cells.get(DEST_PAINT_COL, {}).get('value')
+        dest_o3_val = dest_cells.get(DEST_O3_COL, {}).get('value')
         
         mapped_cells: List[Dict[str, Any]] = []
         
         if dest_row is None:
-            # INSERT only if source "Paint" is "Phoenix or Subcontractor"
-            if src_paint_val == "Phoenix" or src_paint_val == "Subcontractor":
+            # INSERT only if source "Other 1" is not " Not Rquired"
+            if src_o3_val != "Not Required":
                  # Build mapped cell payload        
                 for src_col, dest_col in COLUMN_MAP.items():
                     if src_col in scells:
                         mapped_cells.append({"columnId": dest_col, "value": scells[src_col].get("value")})
                 
-                mapped_cells.append({"columnId": DEST_PRIMERY_COL, "value": ROW_VALUE_PAINT}) # Primary column
+                mapped_cells.append({"columnId": DEST_PRIMERY_COL, "value": ROW_VALUE_O3}) # Primary column
                 mapped_cells.append({"columnId": DEST_ORDER_COL, "value": DEST_ORDER_VAL}) # Order
-                # Force Row column in destination to Paint"
-                mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_PAINT})
-                mapped_cells.append({"columnId": DEST_PAINT_COL, "value": src_paint_val}) # Paint column on 07 sheet with the value from 02 sheet
+                # Force Row column in destination to Other 1"
+                mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_O3})
+                mapped_cells.append({"columnId": DEST_O3_COL, "value": src_o3_val}) # Other 3 column on 09 sheet with the value from 02 sheet
 
                 inserts.append({"toBottom": True, "cells": mapped_cells})
-                logging.info(f"[Plan] INSERT tank={tank_key} (Paint = {src_paint_val})")
+                logging.info(f"[Plan] INSERT tank={tank_key} (Other 2 = {src_o3_val})")
             else:
-                logging.info(f"[Plan] SKIP insert tank={tank_key} (Paint = {src_paint_val})")
+                logging.info(f"[Plan] SKIP insert tank={tank_key} (Other 2 = {src_o3_val})")
         else:
             # UPDATE always if there are diffs
             
-            dest_paint_val = dest_cells.get(DEST_PAINT_COL, {}).get('value')
+            dest_o3_val = dest_cells.get(DEST_O3_COL, {}).get('value')
             src_project_manager_val = str((scells.get(SRC_PROJECT_MANAGER_COL) or {}).get("value") or "").strip()
             dest_project_manager_val = dest_cells.get(DEST_PROJECT_MANAGER_COL, {}).get('value')
 
-            if(src_paint_val != dest_paint_val):
-                mapped_cells.append({"columnId": DEST_PAINT_COL, "value": src_paint_val})      # update the Paint column on 05 sheet with the value from 02 sheet
-                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Paint from {dest_paint_val} to {src_paint_val})")
+            if(src_o3_val != dest_o3_val):
+                mapped_cells.append({"columnId": DEST_O3_COL, "value": src_o3_val}) # update the Other 3 column on 09 sheet with the value from 02 sheet
+                logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Other 1 from {dest_o3_val} to {src_o3_val})")
 
             if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
-                mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet
-                mapped_cells.append({"columnId": DEST_CONTRACT_DAYS_COL, "value": src_contract_days_val})      # update the Contract Days column on 04 sheet with the value from 02 sheet
-                mapped_cells.append({"columnId": DEST_NTP_COMPLETION_DATE_COL, "value": src_ntp_completion_date_val})      # update the NTP Completion Date column on 07 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 09 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": DEST_CONTRACT_DAYS_COL, "value": src_contract_days_val})      # update the Contract Days column on 09 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": DEST_NTP_COMPLETION_DATE_COL, "value": src_ntp_completion_date_val})      # update the NTP Completion Date column on 09 sheet with the value from 02 sheet
                 logging.info(f"[Plan] UPDATE tank={tank_key} (NTP Date = {src_ntp_date_val})")
-
+            
             if(src_project_manager_val != dest_project_manager_val):
                 mapped_cells.append({"columnId": DEST_PROJECT_MANAGER_COL, "value": src_project_manager_val}) # update the Project Manager column on 09 sheet with the value from 02 sheet
-                logging.info(f"[Plan] UPDATE tank={tank_key} (Project Manager = {src_project_manager_val})")    
+                logging.info(f"[Plan] UPDATE tank={tank_key} (Project Manager = {src_project_manager_val})")
 
             if mapped_cells:
                 updates.append({"id": dest_row["id"], "cells": mapped_cells})
@@ -447,7 +447,7 @@ def main(mytimer: func.TimerRequest) -> None:
             return
 
         dest_index = index_dest_by_tank_and_row()
-        logging.info(f"[SmartsheetSync] Indexed destination rows (Row='Paint'): {len(dest_index)}")
+        logging.info(f"[SmartsheetSync] Indexed destination rows (Row='Other 3'): {len(dest_index)}")
 
         inserts, updates = build_operations(source_rows, dest_index)
         logging.info(f"[SmartsheetSync] Plan => inserts: {len(inserts)} | updates: {len(updates)}")
@@ -462,5 +462,5 @@ def main(mytimer: func.TimerRequest) -> None:
         save_last_run(start_ts)
         logging.info("[SmartsheetSync] Done.")
     except Exception as ex:
-        logging.exception(f"[identity-paint-sync] FAILED: {ex}")
+        logging.exception(f"[identity-other3-sync] FAILED: {ex}")
         raise
