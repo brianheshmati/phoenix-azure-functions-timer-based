@@ -359,7 +359,7 @@ def build_operations(
                 mapped_cells.append({"columnId": DEST_ORDER_COL, "value": DEST_ORDER_VAL}) # Order
                 # Force Row column in destination to Other 1"
                 mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_O1})
-                mapped_cells.append({"columnId": DEST_O1_COL, "value": src_O1_val}) # Other 1 column on 09 sheet with the value from 02 sheet
+                mapped_cells.append({"columnId": DEST_O1_COL, "value": src_o1_val}) # Other 1 column on 09 sheet with the value from 02 sheet
 
                 inserts.append({"toBottom": True, "cells": mapped_cells})
                 logging.info(f"[Plan] INSERT tank={tank_key} (Other 1 = {src_o1_val})")
