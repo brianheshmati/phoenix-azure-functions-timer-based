@@ -347,13 +347,13 @@ def build_operations(
         
         if dest_row is None:
             # INSERT only if source "Other 1" is not " Not Rquired"
-            if src_o4_val != "Not Required":
+            if src_o4_val != "Not Required" and src_o4_val != None and src_o4_val != "":
                  # Build mapped cell payload        
                 for src_col, dest_col in COLUMN_MAP.items():
                     if src_col in scells:
                         mapped_cells.append({"columnId": dest_col, "value": scells[src_col].get("value")})
                 
-                mapped_cells.append({"columnId": DEST_PRIMERY_COL, "value": ROW_VALUE_O4}) # Primary column
+                mapped_cells.append({"columnId": DEST_PRIMERY_COL, "value": src_o4_val}) # Primary column
                 mapped_cells.append({"columnId": DEST_ORDER_COL, "value": DEST_ORDER_VAL}) # Order
                 # Force Row column in destination to Other 1"
                 mapped_cells.append({"columnId": DEST_ROW_COL, "value": ROW_VALUE_O4})
