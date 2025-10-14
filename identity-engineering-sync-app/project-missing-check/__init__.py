@@ -146,6 +146,7 @@ def main(mytimer: func.TimerRequest) -> None:
                 continue
 
             try:
+                logging.info(f"🔍 Processing sheet: {name} (ID: {sid})")
                 dest_rows = get_all_rows(sid)
                 if not dest_rows:
                     results.append(f"⚠️  {name}: No data or fetch error")
@@ -155,15 +156,22 @@ def main(mytimer: func.TimerRequest) -> None:
                 for row in dest_rows:
                     cells = {c["columnId"]: c.get("value") for c in row.get("cells", [])}
                     missing_col = cols.get("missing")
-                    if missing_col and cells.get(missing_col) is True:
-                        continue
+                    # if missing_col and cells.get(missing_col) is True:
+                    #     continue
 
                     key = extract_key(row, cols["tank"], cols["city"], cols["state"])
+                    
                     if key and key not in src_keys:
+                        logging.info(f"Sheet name: {name}: Row {row['id']} key: '{key}', missing_col: {missing_col}, src_keys contains key: {key in src_keys}")
                         updates.append({
                             "id": row["id"],
                             "cells": [{"columnId": missing_col, "value": True}]
                         })
+                    else:
+                        updates.append({
+                            "id": row["id"],
+                            "cells": [{"columnId": missing_col, "value": False}]
+                        })    
 
                 if updates:
                     count = bulk_update(sid, updates)
