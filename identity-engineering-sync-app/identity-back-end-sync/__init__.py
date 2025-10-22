@@ -64,11 +64,11 @@ IDENTITY_FOUNDATION_COLUMN_MAP : Dict[int, int] = {
     6659273232437124: 3870631103516548,  # Type
     4618579651284868: 5665034080046980,   # Project manager
     5885217046482820: 3413234266361732,  # Estimator
-    6448166999904132: 8374230730887044,  # Contract date
-    3844523465330564: 1055881336409988,  # NTP date
-    8348123092701060: 5559480963780484,  # Contract days
-    1029773698224004: 3307681150095236,  # NTP completion date
-    5533373325594500: 7811280777465732,   # LDs
+    # 6448166999904132: 8374230730887044,  # Contract date
+    # 3844523465330564: 1055881336409988,  # NTP date
+    # 8348123092701060: 5559480963780484,  # Contract days
+    # 1029773698224004: 3307681150095236,  # NTP completion date
+    # 5533373325594500: 7811280777465732,   # LDs
     4407473418751876: 6790933986889604,  # Engineering firm
     8911073046122372: 1161434452676484,  # Owner
     1381617419112324: 7916833893732228,  # Bid #
@@ -373,11 +373,11 @@ def build_operations(
                 mapped_cells.append({"columnId": DEST_BACK_END_COL, "value": src_back_end_val})      # update the Deep Foundation column on 04 sheet with the value from 02 sheet
                 logging.info(f"[Plan] UPDATE tank={tank_key} (Turning Back End from {dest_back_end_val} to '{src_back_end_val})'")
 
-            if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
-                mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet
-                mapped_cells.append({"columnId": DEST_CONTRACT_DAYS_COL, "value": src_contract_days_val})      # update the Contract Days column on 04 sheet with the value from 02 sheet
-                mapped_cells.append({"columnId": DEST_NTP_COMPLETION_DATE_COL, "value": src_ntp_completion_date_val})      # update the NTP Completion Date column on 04 sheet with the value from 02 sheet
-                logging.info(f"[Plan] UPDATE tank={tank_key} (NTP Date = {src_ntp_date_val})")
+            # if(src_ntp_date_val != dest_cells.get(DEST_NTP_DATE_COL, {}).get("value")):
+            #     mapped_cells.append({"columnId": DEST_NTP_DATE_COL, "value": src_ntp_date_val})      # update the NTP Date column on 04 sheet with the value from 02 sheet
+            #     mapped_cells.append({"columnId": DEST_CONTRACT_DAYS_COL, "value": src_contract_days_val})      # update the Contract Days column on 04 sheet with the value from 02 sheet
+            #     mapped_cells.append({"columnId": DEST_NTP_COMPLETION_DATE_COL, "value": src_ntp_completion_date_val})      # update the NTP Completion Date column on 04 sheet with the value from 02 sheet
+            #     logging.info(f"[Plan] UPDATE tank={tank_key} (NTP Date = {src_ntp_date_val})")
 
             if(src_project_manager_val != dest_project_manager_val):
                 mapped_cells.append({"columnId": DEST_PROJECT_MANAGER_COL, "value": src_project_manager_val}) # update the Project Manager column on 09 sheet with the value from 02 sheet
