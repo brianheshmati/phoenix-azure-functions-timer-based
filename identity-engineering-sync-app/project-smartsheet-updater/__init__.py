@@ -13,7 +13,7 @@ from typing import Dict
 SS_API_BASE = "https://api.smartsheet.com/2.0"
 SMARTSHEET_TOKEN = os.environ["SMARTSHEET_ACCESS_TOKEN"]
 
-DRY_RUN = os.getenv("DRY_RUN", "false").lower() == "true"
+DRY_RUN = os.getenv("DRY_RUN_SMARTSHEET_UPDATER", "false").lower() == "true"
 
 HEADERS = {
     "Authorization": f"Bearer {SMARTSHEET_TOKEN}",
@@ -68,7 +68,7 @@ def log_audit(**kwargs):
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO dbo.IntegrationAuditLog (
+            INSERT INTO dbo.ProjectSmartsheetAuditLog (
                 Direction, Operation, SheetId, RowId,
                 JobNumber, Department, City, State,
                 Success, Message, PerformedBy

@@ -1,0 +1,108 @@
+Sample HTTP Call
+Endpoint
+POST https://<your-function-app>.azurewebsites.net/api/SmartsheetSync
+
+Headers
+Content-Type: application/json
+Authorization: Bearer <FUNCTION_OR_AAD_TOKEN>
+X-Correlation-ID: 6c0c8c94-2c4a-4f6f-9a5b-19c63c40c9e1
+X-User: brian.heshmat@phoenixtanks.com
+
+
+⚠️ X-MS-CLIENT-PRINCIPAL-NAME will be auto-populated if you’re using Azure AD auth.
+X-User is only a fallback.
+
+Sample Request Body (Array)
+[
+  {
+    "jobNumber": "PHX-001",
+    "department": "Foundation",
+    "city": "Dallas",
+    "state": "TX",
+    "updates": {
+      "PM": "John Smith",
+      "FDN": "Mike Rodriguez",
+      "Foreman/Sub": "ACME Concrete"
+    }
+  },
+  {
+    "jobNumber": "PHX-002",
+    "department": "Engineering",
+    "city": "Phoenix",
+    "state": "AZ",
+    "updates": {
+      "ENG": "Sarah Chen"
+    }
+  }
+]
+
+What the function does with this:
+- Resolves sheet by department
+- Finds row using Tank # + City + State
+- Updates only mapped columns
+- Pulls authoritative schedule values back
+----------
+
+Sample Successful Response
+{
+  "status": "ok",
+  "dryRun": false,
+  "correlationId": "6c0c8c94-2c4a-4f6f-9a5b-19c63c40c9e1",
+  "results": [
+    {
+      "jobNumber": "PHX-001",
+      "department": "Foundation",
+      "city": "Dallas",
+      "state": "TX",
+      "updates": {
+        "PM": "John Smith",
+        "FDN": "Mike Rodriguez",
+        "Foreman/Sub": "ACME Concrete"
+      },
+      "smartsheet": {
+        "sheetId": 4814574961250180,
+        "rowId": 88992211,
+        "values": {
+          "Duration": 12,
+          "Start Date": "2025-02-01",
+          "End Date": "2025-02-15"
+        }
+      }
+    },
+    {
+      "jobNumber": "PHX-002",
+      "department": "Engineering",
+      "city": "Phoenix",
+      "state": "AZ",
+      "updates": {
+        "ENG": "Sarah Chen"
+      },
+      "smartsheet": {
+        "sheetId": 639499383033732,
+        "rowId": 77441122,
+        "values": {
+          "Duration": 8,
+          "Start Date": "2025-01-20",
+          "End Date": "2025-01-30"
+        }
+      }
+    }
+  ]
+}
+
+4️⃣ Partial Match / No Match Example
+Response still succeeds — per-row failure is explicit
+{
+  "status": "ok",
+  "dryRun": false,
+  "correlationId": "6c0c8c94-2c4a-4f6f-9a5b-19c63c40c9e1",
+  "results": [
+    {
+      "jobNumber": "PHX-003",
+      "department": "Erection",
+      "city": "Reno",
+      "state": "NV",
+      "error": "No matching Smartsheet row found"
+    }
+  ]
+}
