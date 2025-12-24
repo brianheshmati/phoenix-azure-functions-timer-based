@@ -5,8 +5,6 @@ import logging
 import requests
 import azure.functions as func
 from typing import Dict, Any, List
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 # ================================================================
 # CONFIGURATION
@@ -37,24 +35,6 @@ HEADERS = {
 MAX_BATCH = 500
 RETRY_DELAY = 3
 
-# ================================================================
-# GLOBAL SESSION (REUSED ACROSS EXECUTIONS)
-# ================================================================
-
-retry_strategy = Retry(
-    total=6,
-    connect=4,
-    read=4,
-    backoff_factor=1.5,
-    allowed_methods=["GET", "PUT"],
-    raise_on_status=False
-)
-
-adapter = HTTPAdapter(max_retries=retry_strategy)
-
-session = requests.Session()
-session.mount("https://", adapter)
-session.mount("http://", adapter)
 
 # ================================================================
 # HELPER FUNCTIONS
@@ -85,7 +65,7 @@ def get_all_rows(sheet_id: int) -> List[Dict[str, Any]]:
     """Fetch all rows from a Smartsheet sheet (bulk GET)."""
     url = f"{SS_API_BASE}/sheets/{sheet_id}"
     try:
-        resp = session.get(url, headers=HEADERS, timeout=30)
+        resp = requests.get(url, headers=HEADERS, timeout=60)
         resp.raise_for_status()
         return resp.json().get("rows", [])
     except requests.exceptions.RequestException as e:
@@ -96,7 +76,6 @@ def get_all_rows(sheet_id: int) -> List[Dict[str, Any]]:
 def bulk_update(sheet_id: int, updates: List[Dict[str, Any]]) -> int:
     """Bulk PUT updates to Smartsheet with retry on 429."""
     total = 0
-
     for i in range(0, len(updates), MAX_BATCH):
         chunk = updates[i:i + MAX_BATCH]
         url = f"{SS_API_BASE}/sheets/{sheet_id}/rows"
@@ -106,30 +85,18 @@ def bulk_update(sheet_id: int, updates: List[Dict[str, Any]]) -> int:
             continue
 
         for attempt in range(2):
-            resp = session.put(
-                url,
-                headers=HEADERS,
-                data=json.dumps(chunk),
-                timeout=30
-            )
-
+            resp = requests.put(url, headers=HEADERS, data=json.dumps(chunk))
             if resp.status_code == 429:
-                logging.warning(
-                    f"⏳ Rate limited on sheet {sheet_id}, retrying in {RETRY_DELAY}s..."
-                )
+                logging.warning(f"⏳ Rate limited on {sheet_id}, retrying in {RETRY_DELAY}s...")
                 time.sleep(RETRY_DELAY)
                 continue
-
             try:
                 resp.raise_for_status()
             except Exception as e:
-                logging.error(
-                    f"❌ Failed updating sheet {sheet_id}: {e} | {resp.text[:150]}"
-                )
+                logging.error(f"❌ Failed updating sheet {sheet_id}: {e} | {resp.text[:150]}")
             break
 
         total += len(chunk)
-
     return total
 
 
@@ -150,9 +117,9 @@ def validate_dest_sheet(dest: Dict[str, Any]) -> bool:
 
 def main(mytimer: func.TimerRequest) -> None:
     mode = "DRY RUN" if DRY_RUN else "LIVE RUN"
-    logging.info("───────────────────────────────────────────────")
+    logging.info(f"───────────────────────────────────────────────")
     logging.info(f"[START] Project Missing check ({mode})")
-    logging.info("───────────────────────────────────────────────")
+    logging.info(f"───────────────────────────────────────────────")
 
     if not DEST_SHEETS:
         logging.warning("⚠️  No destination sheets configured. Exiting.")
@@ -161,14 +128,8 @@ def main(mytimer: func.TimerRequest) -> None:
     try:
         # 1️⃣ Load source keys
         src_rows = get_all_rows(SOURCE_SHEET_ID)
-        src_keys = {
-            k for r in src_rows
-            if (k := extract_key(r, SRC_COL_TANK, SRC_COL_CITY, SRC_COL_STATE))
-        }
-
-        logging.info(
-            f"✅ Loaded {len(src_keys)} source project keys from Sheet {SOURCE_SHEET_ID}"
-        )
+        src_keys = {k for r in src_rows if (k := extract_key(r, SRC_COL_TANK, SRC_COL_CITY, SRC_COL_STATE))}
+        logging.info(f"✅ Loaded {len(src_keys)} source project keys from Sheet {SOURCE_SHEET_ID}")
 
         total_updates = 0
         results = []
@@ -179,6 +140,7 @@ def main(mytimer: func.TimerRequest) -> None:
             name = dest.get("sheet_name", str(sid))
             cols = dest.get("cols", {})
 
+            # Validate config
             if not validate_dest_sheet(dest):
                 results.append(f"⚠️  {name}: Skipped (invalid column mapping)")
                 continue
@@ -186,30 +148,35 @@ def main(mytimer: func.TimerRequest) -> None:
             try:
                 logging.info(f"🔍 Processing sheet: {name} (ID: {sid})")
                 dest_rows = get_all_rows(sid)
-
                 if not dest_rows:
                     results.append(f"⚠️  {name}: No data or fetch error")
                     continue
 
                 updates = []
-                missing_col = cols["missing"]
-
                 for row in dest_rows:
-                    key = extract_key(row, cols["tank"], cols["city"], cols["state"])
-                    is_missing = bool(key and key not in src_keys)
+                    cells = {c["columnId"]: c.get("value") for c in row.get("cells", [])}
+                    missing_col = cols.get("missing")
+                    # if missing_col and cells.get(missing_col) is True:
+                    #     continue
 
-                    updates.append({
-                        "id": row["id"],
-                        "cells": [{"columnId": missing_col, "value": is_missing}]
-                    })
+                    key = extract_key(row, cols["tank"], cols["city"], cols["state"])
+                    
+                    if key and key not in src_keys:
+                        logging.info(f"Sheet name: {name}: Row {row['id']} key: '{key}', missing_col: {missing_col}, src_keys contains key: {key in src_keys}")
+                        updates.append({
+                            "id": row["id"],
+                            "cells": [{"columnId": missing_col, "value": True}]
+                        })
+                    else:
+                        updates.append({
+                            "id": row["id"],
+                            "cells": [{"columnId": missing_col, "value": False}]
+                        })    
 
                 if updates:
                     count = bulk_update(sid, updates)
                     total_updates += count
-                    results.append(
-                        f"✅ {name}: {count} rows "
-                        f"{'would be' if DRY_RUN else 'were'} marked Project Missing"
-                    )
+                    results.append(f"✅ {name}: {count} rows {'would be' if DRY_RUN else 'were'} marked Project Missing")
                 else:
                     results.append(f"✔️  {name}: No missing projects")
 
@@ -218,12 +185,8 @@ def main(mytimer: func.TimerRequest) -> None:
 
         # 3️⃣ Summary
         logging.info("───────────────────────────────────────────────")
-        logging.info(
-            f"🏁 Completed {mode}: {total_updates} rows "
-            f"{'to update' if DRY_RUN else 'updated'}"
-        )
+        logging.info(f"🏁 Completed {mode}: {total_updates} rows {'to update' if DRY_RUN else 'updated'}")
         logging.info("───────────────────────────────────────────────")
-
         for line in results:
             logging.info(line)
 

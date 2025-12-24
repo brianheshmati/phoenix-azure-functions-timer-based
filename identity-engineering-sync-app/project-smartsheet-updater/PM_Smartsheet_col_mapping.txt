@@ -1,0 +1,12 @@
+key fields:
+job# = Text28
+Department = Text29
+City = Name
+State = Text25
+
+fields that need to be updated in project
+Duration = Duration
+Start = Start
+Finish = Finish
+
+
